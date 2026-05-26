@@ -10,11 +10,9 @@
 
 Local macOS app that audits the prompts you send to your AI desktop apps (Claude, ChatGPT, Codex, Antigravity), tagging each with timestamps, latency, the app, and an optional project context. Sessions are explicit (record / stop) and can be exported as PDF or XLSX.
 
-![Sessions list with per-app badges](docs/screenshot-home.png)
-
-Each session can mix multiple AI apps. Prompts are color-coded by source (Claude / ChatGPT / Codex / Antigravity) and the session detail page shows the per-app split:
-
 ![Session detail with per-app breakdown](docs/screenshot-session.png)
+
+Each session can mix multiple AI apps. Prompts are color-coded by source (Claude / ChatGPT / Codex / Antigravity) and the session detail page shows the per-app split at the top.
 
 ## Architecture
 
