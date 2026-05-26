@@ -1,6 +1,5 @@
 import { sendToDaemon } from "@/lib/daemon-client";
 import { readSettings } from "@/lib/settings";
-import { TARGET_APP_LABEL, type TargetApp } from "@promptlog/shared";
 import {
   Card,
   CardContent,
@@ -9,6 +8,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { TargetAppToggles } from "@/components/target-app-toggles";
 
 export const dynamic = "force-dynamic";
 
@@ -79,23 +79,12 @@ export default async function SettingsPage() {
         <CardHeader>
           <CardTitle className="text-base">Target apps</CardTitle>
           <CardDescription>
-            The capture loop polls these when a session is active. Toggling is
-            wired through settings.json — edit that file directly for now.
+            The capture loop polls these when a session is active. Disable any
+            apps you don't want audited.
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <ul className="space-y-1 text-sm">
-            {(Object.keys(TARGET_APP_LABEL) as TargetApp[]).map((k) => (
-              <li key={k} className="flex items-center justify-between">
-                <span>{TARGET_APP_LABEL[k]}</span>
-                {settings.enabledApps[k] ? (
-                  <Badge variant="secondary">enabled</Badge>
-                ) : (
-                  <Badge variant="outline">disabled</Badge>
-                )}
-              </li>
-            ))}
-          </ul>
+          <TargetAppToggles settings={settings} />
         </CardContent>
       </Card>
     </div>
