@@ -1,7 +1,15 @@
 import { AxClient } from "./ax.js";
 import { CaptureLoop } from "./capture.js";
 import { startSocketServer } from "./socket.js";
+import { rebuildFtsIndex } from "@promptlog/db/queries";
 import type { DaemonResponse, DaemonStatus } from "@promptlog/shared";
+
+// FTS5 index is content-bearing (not external-content), so it relies on
+// insertPrompt to mirror rows. Anything that bypasses that — manual SQL
+// inserts, partial writes from a crash, restore from a non-FTS-aware backup —
+// can leave search broken. Re-mirroring on startup is idempotent and cheap.
+const ftsRows = rebuildFtsIndex();
+console.log(`[daemon] FTS index synced — ${ftsRows} rows`);
 
 const ax = new AxClient();
 const capture = new CaptureLoop(ax);

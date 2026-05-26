@@ -44,6 +44,28 @@ export function deleteSession(id: number) {
   return row;
 }
 
+// Re-mirror the prompts table into the FTS5 index from scratch. The schema
+// keeps the FTS table content-bearing (not external-content), so a stray
+// insert that bypasses insertPrompt — or a crash between the prompts insert
+// and the FTS insert — can leave the index drifted. Call this on daemon
+// startup so search stays consistent regardless of how rows got in.
+export function rebuildFtsIndex() {
+  const tx = sqlite.transaction(() => {
+    sqlite.prepare("DELETE FROM prompts_fts").run();
+    sqlite
+      .prepare(
+        `INSERT INTO prompts_fts (rowid, prompt_text, response_snippet)
+         SELECT id, prompt_text, COALESCE(response_snippet, '') FROM prompts`,
+      )
+      .run();
+  });
+  tx();
+  const { count } = sqlite
+    .prepare("SELECT COUNT(*) AS count FROM prompts_fts")
+    .get() as { count: number };
+  return count;
+}
+
 export function activeSession() {
   return db
     .select()

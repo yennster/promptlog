@@ -26,6 +26,7 @@ const {
   getSessionPrompts,
   deleteSession,
   stopSession,
+  rebuildFtsIndex,
 } = await import("@promptlog/db/queries");
 
 // Run migrations on the temporary DB
@@ -135,6 +136,75 @@ test("Database Lifecycle — creation, prompt ingestion, FTS search, and deletio
   // 8. Stop session
   const stoppedSession = stopSession(session.id);
   // Row does not exist since we deleted it, but wait, returning should handle gracefully
+});
+
+test("searchPrompts — substring and prefix matches", () => {
+  const s = createSession({ name: "Search Test" });
+  insertPrompt({
+    sessionId: s.id,
+    app: "claude",
+    promptText: "Add an integration test for the new endpoint",
+    sentAt: new Date(),
+  });
+  insertPrompt({
+    sessionId: s.id,
+    app: "chatgpt",
+    promptText: "What's the best way to write integration tests?",
+    sentAt: new Date(),
+  });
+  insertPrompt({
+    sessionId: s.id,
+    app: "codex",
+    promptText: "Refactor the auth flow",
+    sentAt: new Date(),
+  });
+
+  // Exact word match — single tokens should hit FTS via the phrase-prefix
+  // query the search page issues.
+  const integration = searchPrompts({ query: "integration" });
+  assert.equal(integration.length, 2);
+
+  // Prefix match — search for "integ" should still hit "integration".
+  const integ = searchPrompts({ query: "integ" });
+  assert.equal(integ.length, 2);
+
+  // No-match — verify the query path doesn't return everything by accident.
+  const nope = searchPrompts({ query: "thereisnomatch" });
+  assert.equal(nope.length, 0);
+
+  // Search + app filter combine via matchesFilters.
+  const claudeOnly = searchPrompts({ query: "integration", app: "claude" });
+  assert.equal(claudeOnly.length, 1);
+  assert.equal(claudeOnly[0].app, "claude");
+
+  deleteSession(s.id);
+});
+
+test("rebuildFtsIndex — recovers from drift after raw-SQL insert", () => {
+  const s = createSession({ name: "FTS Drift Test" });
+  // Insert directly into the prompts table, bypassing insertPrompt's FTS
+  // mirror. This is what happens if someone seeds data via sqlite3 CLI, or if
+  // a crash interrupts insertPrompt between the prompts insert and the FTS
+  // insert.
+  sqlite
+    .prepare(
+      `INSERT INTO prompts (session_id, app, prompt_text, sent_at)
+       VALUES (?, 'claude', ?, ?)`,
+    )
+    .run(s.id, "Some prompt about integration testing", Date.now());
+
+  // Before rebuild: FTS doesn't see the raw-inserted row, so search fails.
+  const before = searchPrompts({ query: "integration testing" });
+  assert.equal(before.length, 0);
+
+  // Rebuild and confirm search now finds it.
+  const synced = rebuildFtsIndex();
+  assert.ok(synced >= 1);
+  const after = searchPrompts({ query: "integration testing" });
+  assert.equal(after.length, 1);
+  assert.equal(after[0].promptText, "Some prompt about integration testing");
+
+  deleteSession(s.id);
 });
 
 // Final cleanup: Close connection and remove temporary folder
