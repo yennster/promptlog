@@ -23,6 +23,11 @@ interface PerAppState {
 const STABLE_MS = 1500;
 const ACTIVE_POLL_MS = 250;
 const IDLE_POLL_MS = 5_000;
+// Hard cap on how long we'll wait for a real response before giving up and
+// finalizing with whatever we have. Prevents a stuck-pending prompt when the
+// app crashes mid-response, the user closes the app, or our filters keep
+// stripping the captured text down to nothing.
+const PENDING_TIMEOUT_MS = 60_000;
 
 export class CaptureLoop {
   private settings = readDaemonSettings();
@@ -183,19 +188,33 @@ export class CaptureLoop {
         cleanedBubble.includes(prior.pendingPromptText) &&
         residual.length < 20;
 
+      // Run the extractor every tick so we can use the result as a gating
+      // condition. Cheap; the blob's bounded by Swift's 16k collectText cap.
+      const candidateResponse = extractAssistantResponse(
+        app,
+        snap.lastAssistantText,
+        prior.pendingPromptText,
+      );
+      // Treat the snapshot as a real assistant response only if there's
+      // genuinely something there after chrome stripping + prompt-anchor
+      // slicing. Without this, ChatGPT was finalizing at ~1.78s on
+      // transitional states where the extracted text came out empty (the
+      // captured bubble was the user message, or a streaming-in chrome-only
+      // frame). PENDING_TIMEOUT_MS is the safety net for genuinely-empty
+      // responses or stuck states.
+      const hasContent = candidateResponse.length >= 3;
+      const timedOut = now - prior.pendingPromptSentAt >= PENDING_TIMEOUT_MS;
+
       if (snap.lastAssistantText !== prior.assistant) {
         prior.assistantStableSince = now;
       } else if (
         !isPromptEcho &&
         prior.assistantStableSince > 0 &&
         now - prior.assistantStableSince >= STABLE_MS &&
-        snap.lastAssistantText.length > 0
+        snap.lastAssistantText.length > 0 &&
+        (hasContent || timedOut)
       ) {
-        const responseText = extractAssistantResponse(
-          app,
-          snap.lastAssistantText,
-          prior.pendingPromptText,
-        );
+        const responseText = candidateResponse;
         const outTokens = estimateTokens(responseText, app);
         const inTokens = estimateTokens(prior.pendingPromptText, app);
         const totalCost = estimateCostUsd(
