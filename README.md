@@ -40,6 +40,18 @@ pnpm db:migrate
 pnpm dev
 ```
 
+### Other Commands
+
+- **Build everything for production (JS/NextJS builds + Swift AX helper)**:
+  ```sh
+  pnpm build
+  ```
+
+- **Run all unit & database integration tests**:
+  ```sh
+  pnpm test
+  ```
+
 On first run, grant **Accessibility** permission to `apps/ax-capture/AxCapture.app` in **System Settings → Privacy & Security → Accessibility**. The dashboard's `/settings` page shows current permission status.
 
 > **Why an .app bundle, not the bare binary?** macOS TCC attributes Accessibility checks to the "responsible" app of the process tree. A bare CLI binary launched from a terminal inherits the terminal's TCC identity — so even if you toggle the binary on, macOS may check your terminal app's permission instead. Wrapping the helper in a `.app` bundle gives it its own bundle identifier and an independent TCC identity, so the toggle does what you'd expect regardless of which terminal launched it.
