@@ -35,19 +35,37 @@ const KNOWN_PLACEHOLDERS: Record<TargetApp, string[]> = {
 
 // Regex strips run anywhere in the text — use these for prefixes, disclaimers,
 // and patterns that wouldn't plausibly appear inside a real assistant message.
+// Line-anchored patterns (`^…$/gm`) prefer this list when the chrome can show
+// variable numbers/text; static labels go in CHROME_LINES instead.
 const RESPONSE_NOISE: Record<TargetApp, RegExp[]> = {
   claude: [
     /Write a message[…\.]*/g,
     /Write your prompt to Claude/g,
     /Add files, connectors, and more/g,
     /Model: [^\n]+/g,
-    /Opus \d[\.\d]*/g,
-    /Sonnet \d[\.\d]*/g,
-    /Haiku \d[\.\d]*/g,
     /Stop response/g,
     /Claude is AI and can make mistakes[^\n]*/g,
     /Claude is responding[^\n]*/g,
     /^Claude responded:?\s*/gm,
+    // Per-message chrome with dynamic content.
+    /^\d+(\.\d+)?[smhd] ago$/gm,
+    /^\d+m \d+s$/gm,
+    /^\d+[smhd]$/gm,
+    /^Ran \d+ commands?(,.*)?$/gm,
+    /^Read \d+ files?(,.*)?$/gm,
+    /^Edited \d+ files?(,.*)?$/gm,
+    /^Created \d+ files?(,.*)?$/gm,
+    // Fragmented forms — the AX tree splits "Ran 11 commands" into separate
+    // text nodes "Ran" / " " / "11 commands", so the literal "N commands" and
+    // "N files" can appear on their own lines.
+    /^\d+ commands?$/gm,
+    /^\d+ files?$/gm,
+    /^\d+\.?\d*k? tokens?$/gm,
+    /^\d+ additions?, \d+ deletions?$/gm,
+    /^Usage: context \d+%, plan \d+%$/gm,
+    /^Opus \d[\.\d]*( 1M)?( · (High|Standard|Low))?$/gm,
+    /^Sonnet \d[\.\d]*( 1M)?( · (High|Standard|Low))?$/gm,
+    /^Haiku \d[\.\d]*( 1M)?( · (High|Standard|Low))?$/gm,
     /^\s*\d{1,2}:\d{2}\s*(AM|PM)\s*$/gm,
   ],
   chatgpt: [
@@ -76,6 +94,44 @@ const CHROME_LINES: Record<TargetApp, Set<string>> = {
     "Use voice mode",
     "Untitled",
     "Untitled, rename chat",
+    // Message footer actions (per-turn controls).
+    "Copy message",
+    "Pin as chapter",
+    "Rewind to here",
+    "Fork from here",
+    "Copy code",
+    // Tool-use breadcrumbs that Claude renders as discrete AX tokens. The
+    // higher-level "Ran N commands" summary is caught by RESPONSE_NOISE; these
+    // are the orphaned pieces the AX tree exposes alongside it.
+    "Ran",
+    "Read",
+    "Edited",
+    "Created",
+    "edited",
+    "ran",
+    "created",
+    "a file",
+    "a command",
+    "a file,",
+    "a command,",
+    ",",
+    ", ",
+    "·",
+    // App shell chrome.
+    "Remote Control",
+    "Session actions",
+    "Views",
+    "Create PR",
+    "Chat mode",
+    "Prompt",
+    "Stop",
+    "Auto",
+    "Add",
+    "Dictation",
+    "Dictation settings",
+    "Type / for commands",
+    "main",
+    "Arrow keys move the tile. Perpendicular arrows preview a split; press Enter to commit or Escape to cancel.",
   ]),
   chatgpt: new Set(["Copy", "Regenerate"]),
   codex: new Set(),

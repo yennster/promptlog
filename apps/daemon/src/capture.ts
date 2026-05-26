@@ -139,19 +139,8 @@ export class CaptureLoop {
         prior.pendingPromptText.length > 0 &&
         cleanedBubble.includes(prior.pendingPromptText) &&
         residual.length < 20;
-      const changed = snap.lastAssistantText !== prior.assistant;
-      const stableMs =
-        prior.assistantStableSince > 0 ? now - prior.assistantStableSince : -1;
-      console.error(
-        `[capture] tick ${app} pending=${prior.pendingPromptId} ` +
-          `changed=${changed} echo=${isPromptEcho} ` +
-          `stableMs=${stableMs} ` +
-          `assistantLen=${snap.lastAssistantText.length} ` +
-          `residualLen=${residual.length} ` +
-          `preview="${snap.lastAssistantText.slice(0, 80).replace(/\n/g, " ⏎ ")}"`,
-      );
 
-      if (changed) {
+      if (snap.lastAssistantText !== prior.assistant) {
         prior.assistantStableSince = now;
       } else if (
         !isPromptEcho &&
@@ -163,19 +152,6 @@ export class CaptureLoop {
           app,
           snap.lastAssistantText,
           prior.pendingPromptText,
-        );
-        console.error(
-          `[capture] finalize ${app} latency=${now - prior.pendingPromptSentAt}ms\n` +
-            `  raw lastAssistantText (${snap.lastAssistantText.length} chars):\n` +
-            snap.lastAssistantText
-              .split("\n")
-              .map((l) => `    | ${l}`)
-              .join("\n") +
-            `\n  extracted (${responseText.length} chars):\n` +
-            responseText
-              .split("\n")
-              .map((l) => `    > ${l}`)
-              .join("\n"),
         );
         const outTokens = estimateTokens(responseText, app);
         const inTokens = estimateTokens(prior.pendingPromptText, app);

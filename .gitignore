@@ -13,3 +13,4 @@ apps/ax-capture/.swiftpm
 apps/ax-capture/Package.resolved
 apps/ax-capture/AxCapture.app
 *.tsbuildinfo
+apps/daemon/test/fixtures/*.json

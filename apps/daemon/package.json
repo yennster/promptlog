@@ -6,7 +6,12 @@
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "start": "tsx src/index.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "node --test --import tsx test/*.test.ts",
+    "ax:snapshot": "tsx tools/ax-debug.ts snapshot",
+    "ax:live": "tsx tools/ax-debug.ts live",
+    "ax:record": "tsx tools/ax-debug.ts record",
+    "ax:replay": "tsx tools/ax-debug.ts replay"
   },
   "dependencies": {
     "@anthropic-ai/tokenizer": "^0.0.4",
