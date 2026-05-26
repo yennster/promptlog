@@ -1,0 +1,18 @@
+{
+  "name": "promptlog",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "concurrently -n web,daemon -c blue,green \"pnpm -C apps/web dev\" \"pnpm -C apps/daemon dev\"",
+    "build": "pnpm -r build && pnpm -C apps/ax-capture build",
+    "build:swift": "pnpm -C apps/ax-capture build",
+    "db:migrate": "pnpm -C apps/web db:migrate",
+    "db:generate": "pnpm -C apps/web db:generate",
+    "typecheck": "pnpm -r typecheck"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.0",
+    "typescript": "^5.7.2"
+  },
+  "packageManager": "pnpm@11.3.0"
+}

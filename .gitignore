@@ -1,0 +1,15 @@
+node_modules
+.next
+dist
+out
+.DS_Store
+*.log
+.env*.local
+.env
+.turbo
+.swift-build
+apps/ax-capture/.build
+apps/ax-capture/.swiftpm
+apps/ax-capture/Package.resolved
+apps/ax-capture/AxCapture.app
+*.tsbuildinfo

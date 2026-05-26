@@ -1,0 +1,10 @@
+{
+  "name": "@promptlog/ax-capture",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "build": "swift build -c release && node ./bundle.mjs",
+    "dev": "swift run ax-capture",
+    "clean": "rm -rf .build .swiftpm AxCapture.app"
+  }
+}
