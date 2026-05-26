@@ -1,7 +1,7 @@
 import { insertPrompt, updatePromptResponse } from "@promptlog/db/queries";
 import type { TargetApp } from "@promptlog/shared";
 import type { AxClient } from "./ax.js";
-import { extractAssistantResponse, snapshotApp } from "./adapters.js";
+import { extractAssistantResponse, snapshotApp, stripChrome } from "./adapters.js";
 import { estimateCostUsd, estimateTokens } from "./cost.js";
 import { currentGuess, refreshFocus } from "./cwd.js";
 import { readDaemonSettings } from "./settings.js";
@@ -17,7 +17,7 @@ interface PerAppState {
 }
 
 const STABLE_MS = 1500;
-const ACTIVE_POLL_MS = 750;
+const ACTIVE_POLL_MS = 250;
 const IDLE_POLL_MS = 5_000;
 
 export class CaptureLoop {
@@ -125,9 +125,36 @@ export class CaptureLoop {
 
     // Track assistant text growth + stability for the in-flight prompt.
     if (prior.pendingPromptId !== null) {
-      if (snap.lastAssistantText !== prior.assistant) {
+      // Right after submit, the AX tree's "last message bubble" is the user's
+      // own just-sent message, not Claude's reply. If we don't guard against
+      // that, the daemon waits STABLE_MS, sees the user bubble didn't change,
+      // and finalizes with the prompt text as the "response". We strip chrome
+      // first so timestamp/action-button noise around the user bubble doesn't
+      // inflate the residual past the echo threshold.
+      const cleanedBubble = stripChrome(app, snap.lastAssistantText);
+      const residual = cleanedBubble
+        .replace(prior.pendingPromptText, "")
+        .trim();
+      const isPromptEcho =
+        prior.pendingPromptText.length > 0 &&
+        cleanedBubble.includes(prior.pendingPromptText) &&
+        residual.length < 20;
+      const changed = snap.lastAssistantText !== prior.assistant;
+      const stableMs =
+        prior.assistantStableSince > 0 ? now - prior.assistantStableSince : -1;
+      console.error(
+        `[capture] tick ${app} pending=${prior.pendingPromptId} ` +
+          `changed=${changed} echo=${isPromptEcho} ` +
+          `stableMs=${stableMs} ` +
+          `assistantLen=${snap.lastAssistantText.length} ` +
+          `residualLen=${residual.length} ` +
+          `preview="${snap.lastAssistantText.slice(0, 80).replace(/\n/g, " ⏎ ")}"`,
+      );
+
+      if (changed) {
         prior.assistantStableSince = now;
       } else if (
+        !isPromptEcho &&
         prior.assistantStableSince > 0 &&
         now - prior.assistantStableSince >= STABLE_MS &&
         snap.lastAssistantText.length > 0
@@ -136,6 +163,19 @@ export class CaptureLoop {
           app,
           snap.lastAssistantText,
           prior.pendingPromptText,
+        );
+        console.error(
+          `[capture] finalize ${app} latency=${now - prior.pendingPromptSentAt}ms\n` +
+            `  raw lastAssistantText (${snap.lastAssistantText.length} chars):\n` +
+            snap.lastAssistantText
+              .split("\n")
+              .map((l) => `    | ${l}`)
+              .join("\n") +
+            `\n  extracted (${responseText.length} chars):\n` +
+            responseText
+              .split("\n")
+              .map((l) => `    > ${l}`)
+              .join("\n"),
         );
         const outTokens = estimateTokens(responseText, app);
         const inTokens = estimateTokens(prior.pendingPromptText, app);

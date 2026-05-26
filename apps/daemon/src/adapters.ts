@@ -33,9 +33,8 @@ const KNOWN_PLACEHOLDERS: Record<TargetApp, string[]> = {
   antigravity: ["Ask Gemini", "Type a message"],
 };
 
-// UI strings that consistently appear around the chat in each target app.
-// The response extractor uses these to trim composer chrome, model picker
-// text, footer disclaimers, etc. out of the captured snippet.
+// Regex strips run anywhere in the text — use these for prefixes, disclaimers,
+// and patterns that wouldn't plausibly appear inside a real assistant message.
 const RESPONSE_NOISE: Record<TargetApp, RegExp[]> = {
   claude: [
     /Write a message[…\.]*/g,
@@ -48,22 +47,60 @@ const RESPONSE_NOISE: Record<TargetApp, RegExp[]> = {
     /Stop response/g,
     /Claude is AI and can make mistakes[^\n]*/g,
     /Claude is responding[^\n]*/g,
-    /Message actions/g,
-    /\bCopy\b/g,
-    /\bEdit\b/g,
-    /\bUntitled\b(?:, rename chat)?/g,
-    /More options/g,
+    /^Claude responded:?\s*/gm,
     /^\s*\d{1,2}:\d{2}\s*(AM|PM)\s*$/gm,
   ],
   chatgpt: [
     /Send a message/g,
     /ChatGPT can make mistakes[^\n]*/g,
-    /Regenerate/g,
-    /Copy/g,
   ],
   codex: [],
   antigravity: [],
 };
+
+// Chrome labels that get their own line in the AX tree (toolbar/control buttons
+// rendered next to each message). We only drop a line if it equals one of these
+// after trimming — so common words like "Edit" or "Retry" survive when they
+// appear inside Claude's actual prose.
+const CHROME_LINES: Record<TargetApp, Set<string>> = {
+  claude: new Set([
+    "Copy",
+    "Edit",
+    "Retry",
+    "Settings",
+    "Message actions",
+    "More options",
+    "Give positive feedback",
+    "Give negative feedback",
+    "Press and hold to record",
+    "Use voice mode",
+    "Untitled",
+    "Untitled, rename chat",
+  ]),
+  chatgpt: new Set(["Copy", "Regenerate"]),
+  codex: new Set(),
+  antigravity: new Set(),
+};
+
+// Strip UI chrome from an AX-tree text blob without doing the prompt-anchor
+// slice. Used both by extractAssistantResponse and by the in-flight echo guard
+// in the capture loop (where we need a chrome-free view of the bubble to tell
+// whether it's the user's own message echo).
+export function stripChrome(app: TargetApp, blob: string): string {
+  if (!blob) return "";
+  let text = blob;
+  for (const re of RESPONSE_NOISE[app]) text = text.replace(re, "");
+  const chrome = CHROME_LINES[app];
+  const lines = text
+    .split("\n")
+    .map((l) => l.trim())
+    .filter((l) => l && !chrome.has(l));
+  const deduped: string[] = [];
+  for (const line of lines) {
+    if (deduped[deduped.length - 1] !== line) deduped.push(line);
+  }
+  return deduped.join("\n").trim();
+}
 
 export function extractAssistantResponse(
   app: TargetApp,
@@ -78,16 +115,7 @@ export function extractAssistantResponse(
     const i = text.lastIndexOf(promptText);
     if (i >= 0) text = text.slice(i + promptText.length);
   }
-  // Strip surrounding UI chrome.
-  for (const re of RESPONSE_NOISE[app]) text = text.replace(re, "");
-  // Collapse runs of whitespace/newlines created by the strips.
-  text = text
-    .split("\n")
-    .map((l) => l.trim())
-    .filter(Boolean)
-    .join("\n")
-    .trim();
-  return text;
+  return stripChrome(app, text);
 }
 
 export function stripPlaceholder(app: TargetApp, text: string): string {
