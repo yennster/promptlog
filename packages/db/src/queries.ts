@@ -59,21 +59,27 @@ export function activeSession() {
 }
 
 export function listSessions(limit = 100) {
+  // Drizzle renders column references unqualified by default when selecting
+  // from a single table. That breaks correlated subqueries — the inner
+  // `WHERE prompts.session_id = id` reads `id` as `prompts.id` (because the
+  // subquery's FROM is `prompts`), not `sessions.id`. So qualify the outer
+  // reference with sql.raw to force "sessions"."id".
+  const sessionIdRef = sql.raw('"sessions"."id"');
   const rows = db
     .select({
       session: sessions,
       promptCount: sql<number>`(
-        SELECT COUNT(*) FROM ${prompts} WHERE ${prompts.sessionId} = ${sessions.id}
+        SELECT COUNT(*) FROM ${prompts} WHERE ${prompts.sessionId} = ${sessionIdRef}
       )`,
       totalCost: sql<number>`(
         SELECT COALESCE(SUM(${prompts.estCostUsd}), 0)
-        FROM ${prompts} WHERE ${prompts.sessionId} = ${sessions.id}
+        FROM ${prompts} WHERE ${prompts.sessionId} = ${sessionIdRef}
       )`,
       // Comma-separated list of distinct apps used in the session — empty
       // string when no prompts yet. Parsed into a TargetApp[] before return.
       appsRaw: sql<string>`(
         SELECT COALESCE(GROUP_CONCAT(DISTINCT ${prompts.app}), '')
-        FROM ${prompts} WHERE ${prompts.sessionId} = ${sessions.id}
+        FROM ${prompts} WHERE ${prompts.sessionId} = ${sessionIdRef}
       )`,
     })
     .from(sessions)

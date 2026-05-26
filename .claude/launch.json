@@ -1,0 +1,18 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "web",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["-C", "apps/web", "dev"],
+      "port": 3000,
+      "autoPort": true
+    },
+    {
+      "name": "daemon",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["-C", "apps/daemon", "dev"],
+      "port": 0
+    }
+  ]
+}

@@ -173,6 +173,51 @@ test("antigravity: strips Agent response label + bubble chrome", () => {
   );
 });
 
+test("chatgpt: strips composer placeholder + disclaimer + Copy/Regenerate", () => {
+  // ChatGPT's AX tree is the cleanest of the four target apps — assistant
+  // text comes through with no per-message chrome in the captured group most
+  // of the time. The filters below still need to handle the cases that DO
+  // appear: composer placeholder leaking, footer disclaimer, regenerate.
+  const blob = [
+    "Send a message",
+    "Here is a list of three random facts:",
+    "1. Octopuses have three hearts.",
+    "2. Honey never spoils.",
+    "3. Bananas are berries.",
+    "Copy",
+    "Regenerate",
+    "ChatGPT can make mistakes. Check important info.",
+  ].join("\n");
+  const result = stripChrome("chatgpt", blob);
+  assert.equal(
+    result,
+    "Here is a list of three random facts:\n1. Octopuses have three hearts.\n2. Honey never spoils.\n3. Bananas are berries.",
+  );
+});
+
+test("chatgpt: prompt anchoring extracts response only", () => {
+  const blob = [
+    "What are some random facts?",
+    "Send a message",
+    "What are some random facts?",
+    "Here are three:",
+    "Octopuses have three hearts.",
+    "Honey never spoils.",
+    "Copy",
+    "Regenerate",
+    "ChatGPT can make mistakes.",
+  ].join("\n");
+  const result = extractAssistantResponse(
+    "chatgpt",
+    blob,
+    "What are some random facts?",
+  );
+  assert.equal(
+    result,
+    "Here are three:\nOctopuses have three hearts.\nHoney never spoils.",
+  );
+});
+
 test("codex: strips per-message chrome and model badge", () => {
   const blob = [
     "Edit user message",
@@ -221,6 +266,7 @@ test("extractAssistantResponse — prose containing chrome-word survives", () =>
 // that for any recorded snapshot, the cleaned output is shorter than the raw
 // and free of known chrome strings.
 const FORBIDDEN_CHROME = [
+  // Claude desktop
   "Copy message",
   "Pin as chapter",
   "Rewind to here",
@@ -229,6 +275,19 @@ const FORBIDDEN_CHROME = [
   "Dictation settings",
   "Press and hold to record",
   "Use voice mode",
+  // ChatGPT
+  "Send a message",
+  "Regenerate",
+  // Antigravity
+  "Agent response",
+  "Good response",
+  "Bad response",
+  "Ask anything, @ to mention, / for actions",
+  // Codex
+  "Edit user message",
+  "Edit message",
+  "Fork from this point",
+  "Ask for follow-up changes",
 ];
 
 if (existsSync(FIXTURE_DIR)) {

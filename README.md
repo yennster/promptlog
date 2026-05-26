@@ -1,6 +1,20 @@
 # Promptlog
 
+[![Platform](https://img.shields.io/badge/platform-macOS-black?logo=apple)](#)
+[![Made with TypeScript](https://img.shields.io/badge/TypeScript-5.7-3178C6?logo=typescript&logoColor=white)](#)
+[![Made with Swift](https://img.shields.io/badge/Swift-5.10-F05138?logo=swift&logoColor=white)](#)
+[![Next.js](https://img.shields.io/badge/Next.js-15-000?logo=nextdotjs&logoColor=white)](#)
+[![pnpm](https://img.shields.io/badge/pnpm-workspace-F69220?logo=pnpm&logoColor=white)](#)
+[![GitHub last commit](https://img.shields.io/github/last-commit/yennster/promptlog)](https://github.com/yennster/promptlog/commits/main)
+[![GitHub stars](https://img.shields.io/github/stars/yennster/promptlog?style=social)](https://github.com/yennster/promptlog/stargazers)
+
 Local macOS app that audits the prompts you send to your AI desktop apps (Claude, ChatGPT, Codex, Antigravity), tagging each with timestamps, latency, the app, and an optional project context. Sessions are explicit (record / stop) and can be exported as PDF or XLSX.
+
+![Sessions list with per-app badges](docs/screenshot-home.png)
+
+Each session can mix multiple AI apps. Prompts are color-coded by source (Claude / ChatGPT / Codex / Antigravity) and the session detail page shows the per-app split:
+
+![Session detail with per-app breakdown](docs/screenshot-session.png)
 
 ## Architecture
 
