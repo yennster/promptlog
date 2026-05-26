@@ -7,6 +7,12 @@ export interface AdapterSnapshot {
   ok: boolean;
   composer: string;
   lastAssistantText: string;
+  // Last user-message bubble text. Empty when the app's AX tree doesn't label
+  // user bubbles (Antigravity does; Claude/ChatGPT/Codex don't). Used as a
+  // fallback prompt source when the composer-clears-on-submit transition is
+  // missed — e.g. when an app is opened mid-session and the AX tree hasn't
+  // plumbed in yet, or the user types and submits faster than the poll.
+  lastUserText: string;
 }
 
 // Chromium-based composer text-areas leak their placeholder string into
@@ -241,6 +247,7 @@ async function readApp(
       lastAssistantText: (
         (r.lastAssistantText as string | undefined) ?? ""
       ).trim(),
+      lastUserText: ((r.lastUserText as string | undefined) ?? "").trim(),
     };
   }
   return null;

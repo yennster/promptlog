@@ -282,6 +282,24 @@ func lastAssistantText(_ app: AXUIElement) -> String? {
     return full
 }
 
+// Last user message bubble. Used as a fallback prompt detector when the
+// composer-clears-on-submit transition isn't observed (typical when the app
+// is opened mid-session and its AX tree hasn't plumbed in yet, or when the
+// user types and sends faster than the daemon's poll interval). Only works
+// for apps that label message bubbles via AXDescription (Antigravity does).
+func lastUserText(_ app: AXUIElement) -> String? {
+    guard let root = conversationRoot(app) else { return nil }
+    let labeled = findAllMatching(root) { el in
+        guard let role = stringAttribute(el, kAXRoleAttribute),
+              role == kAXGroupRole else { return false }
+        let desc = stringAttribute(el, kAXDescriptionAttribute) ?? ""
+        return USER_LABELS.contains(desc)
+    }
+    guard let last = labeled.last else { return nil }
+    let text = collectText(last, limit: 16_000)
+    return text.isEmpty ? nil : text
+}
+
 // Dump the AX tree of an app for debugging. Emits a JSON object with a list of
 // elements (role, depth, size, value preview, child count) up to maxDepth.
 func dump(bundleId: String, maxDepth: Int = 22) -> [String: Any] {
@@ -347,11 +365,13 @@ func snapshot(bundleId: String) -> [String: Any] {
         }
     }
     let assistant = lastAssistantText(app) ?? ""
+    let userBubble = lastUserText(app) ?? ""
     return [
         "ok": true,
         "bundleId": bundleId,
         "composer": composerText,
         "lastAssistantText": assistant,
+        "lastUserText": userBubble,
         "ts": Int(Date().timeIntervalSince1970 * 1000)
     ]
 }

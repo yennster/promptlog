@@ -9,6 +9,10 @@ import { readDaemonSettings } from "./settings.js";
 interface PerAppState {
   composer: string;
   assistant: string;
+  // Last known user-message bubble text from the AX tree. Used by the
+  // fallback prompt detector for apps that label user bubbles (Antigravity)
+  // — see tickApp.
+  lastUserText: string;
   assistantStableSince: number;
   pendingPromptId: number | null;
   pendingPromptText: string;
@@ -79,6 +83,7 @@ export class CaptureLoop {
       s = {
         composer: "",
         assistant: "",
+        lastUserText: "",
         assistantStableSince: 0,
         pendingPromptId: null,
         pendingPromptText: "",
@@ -96,14 +101,29 @@ export class CaptureLoop {
     const prior = this.prior(app);
     const now = Date.now();
 
-    // Detect a prompt send: composer transitioned from non-empty to empty.
-    const sent =
+    // Primary detector: composer transitioned from non-empty to empty.
+    const composerSent =
       prior.composer.length >= 2 &&
       snap.composer.length === 0 &&
       this.activeSessionId !== null;
 
+    // Fallback detector: a new "User message" bubble appeared in the chat
+    // (for apps that label them — currently Antigravity). This catches the
+    // case where the app was opened mid-session and the AX tree hadn't
+    // surfaced the composer text before submit, so the composer transition
+    // was never observed. We only trust this when we don't already have a
+    // pending prompt, to avoid double-recording sends that the composer path
+    // also caught.
+    const userBubbleSent =
+      !composerSent &&
+      prior.pendingPromptId === null &&
+      snap.lastUserText.length >= 2 &&
+      snap.lastUserText !== prior.lastUserText &&
+      this.activeSessionId !== null;
+
+    const sent = composerSent || userBubbleSent;
     if (sent) {
-      const promptText = prior.composer;
+      const promptText = composerSent ? prior.composer : snap.lastUserText;
       const cwdGuess = currentGuess();
       const inTokens = estimateTokens(promptText, app);
       const inCost = estimateCostUsd(app, inTokens, 0, this.settings.costRates);
@@ -178,5 +198,6 @@ export class CaptureLoop {
 
     prior.composer = snap.composer;
     prior.assistant = snap.lastAssistantText;
+    prior.lastUserText = snap.lastUserText;
   }
 }
