@@ -2,11 +2,7 @@ import Link from "next/link";
 import { activeSession, listSessions } from "@promptlog/db/queries";
 import { sendToDaemon } from "@/lib/daemon-client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { AppBadge } from "@/components/app-badge";
-
-import { DeleteSessionButton } from "@/components/delete-session-button";
-import { formatDateTime, formatDuration } from "@/lib/utils";
+import { SessionsTable } from "@/components/sessions-table";
 
 export const dynamic = "force-dynamic";
 
@@ -71,77 +67,7 @@ export default async function HomePage() {
               No sessions yet. Press record to start one.
             </p>
           ) : (
-            <table className="w-full text-sm">
-              <thead className="text-xs uppercase tracking-wider text-muted-foreground">
-                <tr className="border-b border-border">
-                  <th className="px-6 py-2 text-left font-medium">Name</th>
-                  <th className="px-6 py-2 text-left font-medium">Started</th>
-                  <th className="px-6 py-2 text-left font-medium">Duration</th>
-                  <th className="px-6 py-2 text-left font-medium">Prompts</th>
-                  <th className="px-6 py-2 text-left font-medium">Apps</th>
-                  <th className="px-6 py-2 text-left font-medium">Context</th>
-                  <th className="px-6 py-2 text-left font-medium">Status</th>
-                  <th className="px-2 py-2 font-medium"></th>
-                </tr>
-              </thead>
-              <tbody>
-                {sessions.map((row) => {
-                  const s = row.session;
-                  const duration = s.endedAt
-                    ? s.endedAt.getTime() - s.startedAt.getTime()
-                    : Date.now() - s.startedAt.getTime();
-                  return (
-                    <tr
-                      key={s.id}
-                      className="border-b border-border last:border-0 hover:bg-accent/40"
-                    >
-                      <td className="px-6 py-3">
-                        <Link
-                          href={`/sessions/${s.id}`}
-                          className="font-medium underline-offset-2 hover:underline"
-                        >
-                          {s.name}
-                        </Link>
-                      </td>
-                      <td className="px-6 py-3 text-muted-foreground">
-                        {formatDateTime(s.startedAt)}
-                      </td>
-                      <td className="px-6 py-3 text-muted-foreground">
-                        {formatDuration(duration)}
-                      </td>
-                      <td className="px-6 py-3">{row.promptCount}</td>
-                      <td className="px-6 py-3">
-                        {row.apps.length === 0 ? (
-                          <span className="text-muted-foreground">—</span>
-                        ) : (
-                          <div className="flex flex-wrap gap-1">
-                            {row.apps.map((a) => (
-                              <AppBadge key={a} app={a} />
-                            ))}
-                          </div>
-                        )}
-                      </td>
-                      <td className="px-6 py-3 text-muted-foreground">
-                        {s.projectContext ?? "—"}
-                      </td>
-                      <td className="px-6 py-3">
-                        {s.endedAt ? (
-                          <Badge variant="secondary">Ended</Badge>
-                        ) : (
-                          <Badge>Active</Badge>
-                        )}
-                      </td>
-                      <td className="px-2 py-3 text-right">
-                        <DeleteSessionButton
-                          sessionId={s.id}
-                          sessionName={s.name}
-                        />
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+            <SessionsTable rows={sessions} />
           )}
         </CardContent>
       </Card>

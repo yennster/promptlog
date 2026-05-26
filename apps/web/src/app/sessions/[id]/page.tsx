@@ -79,6 +79,12 @@ export default async function SessionPage({
           >
             Export XLSX
           </a>
+          <a
+            href={`/api/sessions/${session.id}/report?format=csv`}
+            className={cn(buttonVariants({ variant: "outline" }))}
+          >
+            Export CSV
+          </a>
           <DeleteSessionButton
             sessionId={session.id}
             sessionName={session.name}

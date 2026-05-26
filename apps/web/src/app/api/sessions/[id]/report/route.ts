@@ -3,6 +3,7 @@ import { renderToBuffer } from "@react-pdf/renderer";
 import { getSession, getSessionPrompts } from "@promptlog/db/queries";
 import { SessionReport } from "@/reports/SessionReport";
 import { buildSessionWorkbook } from "@/reports/sessionWorkbook";
+import { buildSessionsCsv } from "@/reports/csv";
 
 export async function GET(
   req: Request,
@@ -21,6 +22,16 @@ export async function GET(
   const url = new URL(req.url);
   const format = url.searchParams.get("format") ?? "pdf";
   const safeName = session.name.replace(/[^a-z0-9-_]+/gi, "_");
+
+  if (format === "csv") {
+    const csv = buildSessionsCsv([{ session, prompts: promptList }]);
+    return new Response(csv, {
+      headers: {
+        "content-type": "text/csv; charset=utf-8",
+        "content-disposition": `attachment; filename="audit-${session.id}-${safeName}.csv"`,
+      },
+    });
+  }
 
   if (format === "xlsx") {
     const buf = await buildSessionWorkbook(session, promptList);
