@@ -2,7 +2,7 @@
 
 [![Platform](https://img.shields.io/badge/platform-macOS-black?logo=apple)](#)
 [![Made with TypeScript](https://img.shields.io/badge/TypeScript-5.7-3178C6?logo=typescript&logoColor=white)](#)
-[![Made with Swift](https://img.shields.io/badge/Swift-5.10-F05138?logo=swift&logoColor=white)](#)
+[![Made with Swift](https://img.shields.io/badge/Swift-5.9-F05138?logo=swift&logoColor=white)](#)
 [![Next.js](https://img.shields.io/badge/Next.js-15-000?logo=nextdotjs&logoColor=white)](#)
 [![pnpm](https://img.shields.io/badge/pnpm-workspace-F69220?logo=pnpm&logoColor=white)](#)
 [![GitHub last commit](https://img.shields.io/github/last-commit/yennster/promptlog)](https://github.com/yennster/promptlog/commits/main)
@@ -52,7 +52,7 @@ pnpm dev
   pnpm test
   ```
 
-On first run, grant **Accessibility** permission to `apps/ax-capture/AxCapture.app` in **System Settings → Privacy & Security → Accessibility**. The dashboard's `/settings` page shows current permission status.
+On first run, grant **Accessibility** permission to `apps/ax-capture/AxCapture.app` in **System Settings → Privacy & Security → Accessibility**. The dashboard's `/settings` page shows current permission status and lets you toggle which apps the capture loop polls (Claude / ChatGPT / Codex / Antigravity).
 
 > **Why an .app bundle, not the bare binary?** macOS TCC attributes Accessibility checks to the "responsible" app of the process tree. A bare CLI binary launched from a terminal inherits the terminal's TCC identity — so even if you toggle the binary on, macOS may check your terminal app's permission instead. Wrapping the helper in a `.app` bundle gives it its own bundle identifier and an independent TCC identity, so the toggle does what you'd expect regardless of which terminal launched it.
 
@@ -68,3 +68,26 @@ A free-text label attached to the session, shown on the dashboard list, the sess
 - **Pure chat / non-code sessions** — leave it blank (the column renders `—`) or use any free-text topic like `job search`, `meal planning`, `RAG research`. There's no validation and no path-existence check — it's just a string.
 
 Use whichever convention helps future-you searching the dashboard.
+
+## Developing the capture pipeline
+
+The daemon includes a CLI harness for iterating on the AX-blob filtering logic
+without driving the UI:
+
+```sh
+# One-shot snapshot of an app's current AX state + filtered output
+pnpm -C apps/daemon ax:snapshot claude
+
+# Live-simulate the capture loop against an app (Ctrl-C to stop)
+pnpm -C apps/daemon ax:live antigravity
+
+# Record N seconds of snapshots to a fixture file
+pnpm -C apps/daemon ax:record claude test/fixtures/foo.json 30
+
+# Replay a saved fixture through the filter pipeline
+pnpm -C apps/daemon ax:replay test/fixtures/foo.json "the user prompt text"
+```
+
+Tests cover per-app chrome stripping (`stripChrome`) and prompt anchoring
+(`extractAssistantResponse`) against both synthetic inputs and recorded
+fixtures. Run with `pnpm test`.
