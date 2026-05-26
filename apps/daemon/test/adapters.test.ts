@@ -19,6 +19,7 @@ import { fileURLToPath } from "node:url";
 import {
   extractAssistantResponse,
   stripChrome,
+  stripPlaceholder,
 } from "../src/adapters.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -179,6 +180,46 @@ test("extractAssistantResponse — prompt appearing only mid-prose preserves ful
     result,
     "Sure! Here's a quicksort implementation written in JavaScript:\nfunction quicksort(arr) { return arr.sort(); }",
   );
+});
+
+test("extractAssistantResponse — prefers user-bubble-marker context over later echo", () => {
+  // Codex regression: response markdown-echoes the prompt verbatim. AX tree
+  // surfaces both the user-bubble copy and the echo as standalone lines. The
+  // last-occurrence anchor used to pick the echo and slice the whole response
+  // off. New behavior: scan for the prompt line whose preceding non-blank
+  // line is a known user-bubble marker ("Edit user message" for Codex).
+  const blob = [
+    "Edit user message",
+    "adfsdfasdf",
+    "",
+    "11:42 PM",
+    "Copy message",
+    "Edit message",
+    "That came through as",
+    "adfsdfasdf", // markdown-echo as a standalone line
+    ", so the message pipeline is alive at least.",
+    "Copy",
+  ].join("\n");
+  const result = extractAssistantResponse("codex", blob, "adfsdfasdf");
+  // The response should include the echo and the surrounding sentence.
+  assert.ok(
+    result.includes("That came through as"),
+    `expected response prefix preserved; got: ${result}`,
+  );
+  assert.ok(
+    result.includes("so the message pipeline is alive at least"),
+    `expected response tail preserved; got: ${result}`,
+  );
+});
+
+test("codex: Ask for follow-up changes placeholder is stripped", () => {
+  // Codex shows "Ask for follow-up changes" as its composer placeholder when
+  // the user is continuing a thread. Without filtering, the daemon caught
+  // this string in prior.composer and recorded it as the prompt.
+  assert.equal(stripPlaceholder("codex", "Ask for follow-up changes"), "");
+  assert.equal(stripPlaceholder("codex", "Ask Codex anything"), "");
+  // Real text passes through.
+  assert.equal(stripPlaceholder("codex", "adfsdfasdf"), "adfsdfasdf");
 });
 
 test("extractAssistantResponse — multi-line response survives", () => {

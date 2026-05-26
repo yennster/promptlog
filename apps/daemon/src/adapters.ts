@@ -35,7 +35,11 @@ const KNOWN_PLACEHOLDERS: Record<TargetApp, string[]> = {
     "Message ChatGPT...",
     "Message ChatGPT",
   ],
-  codex: ["Ask Codex anything", "Send a message"],
+  codex: [
+    "Ask Codex anything",
+    "Send a message",
+    "Ask for follow-up changes",
+  ],
   antigravity: ["Ask Gemini", "Type a message"],
 };
 
@@ -206,6 +210,19 @@ export function stripChrome(app: TargetApp, blob: string): string {
   return deduped.join("\n").trim();
 }
 
+// AX-tree labels that precede a user-message bubble. When we find the prompt
+// as a standalone line, we prefer ones immediately following one of these so
+// we anchor on the real user bubble rather than the assistant echoing the
+// prompt back inside its response. Codex's response often quotes the user
+// verbatim as a markdown inline-code span which the AX tree exposes as its
+// own AXStaticText line — without this preference we'd slice off the entire
+// response and leave only the post-echo tail.
+const USER_BUBBLE_MARKERS = new Set([
+  "Edit user message",
+  "User message",
+  "Your message",
+]);
+
 export function extractAssistantResponse(
   app: TargetApp,
   blob: string,
@@ -215,19 +232,25 @@ export function extractAssistantResponse(
   let text = blob;
   // Anchor on the user's own prompt if we can find it AS A STANDALONE LINE —
   // that signals a user-message bubble (separately rendered AXStaticText),
-  // not an echo of the prompt inside the assistant's response. Without this
-  // guard, prompt="asdf" against response "You typed: asdfasd" would slice
-  // mid-word and leave just "asd".
+  // not an echo of the prompt inside the assistant's response.
   if (promptText) {
     const promptLine = promptText.trim();
     const lines = text.split("\n");
-    let anchor = -1;
+    let markedAnchor = -1;
+    let fallbackAnchor = -1;
     for (let i = lines.length - 1; i >= 0; i--) {
-      if ((lines[i] ?? "").trim() === promptLine) {
-        anchor = i;
+      if ((lines[i] ?? "").trim() !== promptLine) continue;
+      // Look back through immediately-preceding blank lines for a marker line.
+      let j = i - 1;
+      while (j >= 0 && (lines[j] ?? "").trim() === "") j--;
+      const prev = j >= 0 ? (lines[j] ?? "").trim() : "";
+      if (USER_BUBBLE_MARKERS.has(prev)) {
+        markedAnchor = i;
         break;
       }
+      if (fallbackAnchor < 0) fallbackAnchor = i;
     }
+    const anchor = markedAnchor >= 0 ? markedAnchor : fallbackAnchor;
     if (anchor >= 0) {
       text = lines.slice(anchor + 1).join("\n");
     }
