@@ -198,6 +198,21 @@ test("extractAssistantResponse — multi-line response survives", () => {
   );
 });
 
+test("antigravity: stripChrome cleans the user-bubble text the daemon uses as a prompt fallback", () => {
+  // collectText on the Antigravity "User message" group concatenates the
+  // description label, the actual message text, the timestamp, and the
+  // "Copy" button. Without this cleanup the daemon was recording prompts
+  // like "User message testing again 11:29 PM Copy".
+  const blob = [
+    "User message",
+    "testing again",
+    "11:29 PM",
+    "Copy",
+  ].join("\n");
+  const result = stripChrome("antigravity", blob);
+  assert.equal(result, "testing again");
+});
+
 test("antigravity: strips Agent response label + bubble chrome", () => {
   const blob = [
     "Agent response",

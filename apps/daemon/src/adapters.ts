@@ -223,7 +223,7 @@ export function extractAssistantResponse(
     const lines = text.split("\n");
     let anchor = -1;
     for (let i = lines.length - 1; i >= 0; i--) {
-      if (lines[i].trim() === promptLine) {
+      if ((lines[i] ?? "").trim() === promptLine) {
         anchor = i;
         break;
       }

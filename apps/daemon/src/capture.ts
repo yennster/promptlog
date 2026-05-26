@@ -125,13 +125,19 @@ export class CaptureLoop {
       );
     }
 
+    // The user-bubble text from the AX tree is wrapped in chrome (the
+    // "User message" description label, timestamp, "Copy" button). Strip
+    // before using as a prompt source or comparing for change detection.
+    const cleanedUserBubble = stripChrome(app, snap.lastUserText);
+    const cleanedPriorUserBubble = stripChrome(app, prior.lastUserText);
+
     // Primary detector: composer transitioned from non-empty to empty.
     const composerSent =
       prior.composer.length >= 2 &&
       snap.composer.length === 0 &&
       this.activeSessionId !== null;
 
-    // Fallback detector: a new "User message" bubble appeared in the chat
+    // Fallback detector: a new user-message bubble appeared in the chat
     // (for apps that label them — currently Antigravity). This catches the
     // case where the app was opened mid-session and the AX tree hadn't
     // surfaced the composer text before submit, so the composer transition
@@ -141,13 +147,24 @@ export class CaptureLoop {
     const userBubbleSent =
       !composerSent &&
       prior.pendingPromptId === null &&
-      snap.lastUserText.length >= 2 &&
-      snap.lastUserText !== prior.lastUserText &&
+      cleanedUserBubble.length >= 2 &&
+      cleanedUserBubble !== cleanedPriorUserBubble &&
       this.activeSessionId !== null;
 
     const sent = composerSent || userBubbleSent;
     if (sent) {
-      const promptText = composerSent ? prior.composer : snap.lastUserText;
+      // Prefer the user-bubble text when both are available and it's a
+      // superstring/longer than the composer-caught text. The composer can
+      // be caught mid-typing (e.g. captured "testi" while user was still
+      // typing "testing"); the user bubble is the final submitted text.
+      let promptText = composerSent ? prior.composer : cleanedUserBubble;
+      if (
+        composerSent &&
+        cleanedUserBubble.length >= promptText.length &&
+        cleanedUserBubble.includes(promptText)
+      ) {
+        promptText = cleanedUserBubble;
+      }
       console.log(
         `[capture] ${app}: prompt detected via ${composerSent ? "composer" : "userBubble"} ` +
           `(${promptText.length} chars): "${promptText.slice(0, 60).replace(/\n/g, " ")}"`,
