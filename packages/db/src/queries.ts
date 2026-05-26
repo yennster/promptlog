@@ -28,16 +28,12 @@ export function stopSession(id: number) {
 }
 
 export function deleteSession(id: number) {
-  // FTS5 has no foreign key cascade, so wipe its rows first by id.
-  const ids = sqlite
-    .prepare("SELECT id FROM prompts WHERE session_id = ?")
-    .all(id) as { id: number }[];
-  if (ids.length) {
-    const placeholders = ids.map(() => "?").join(",");
-    sqlite
-      .prepare(`DELETE FROM prompts_fts WHERE rowid IN (${placeholders})`)
-      .run(...ids.map((r) => r.id));
-  }
+  // FTS5 has no foreign key cascade, so wipe its rows first by id using a subquery.
+  // This avoids retrieving all IDs into JavaScript and avoids SQLite's parameter limits.
+  sqlite
+    .prepare("DELETE FROM prompts_fts WHERE rowid IN (SELECT id FROM prompts WHERE session_id = ?)")
+    .run(id);
+
   // The prompts.session_id foreign key has onDelete cascade, so deleting
   // the session row removes its prompts too.
   const row = db

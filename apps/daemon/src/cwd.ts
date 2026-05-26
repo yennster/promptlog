@@ -59,12 +59,19 @@ export function currentGuess(): CwdGuess | null {
 export function extractPath(title: string): string | null {
   if (!title) return null;
 
+  // Clean common editor suffixes from the end of the title
+  let cleanTitle = title
+    .replace(/\s*\((Workspace|workspace)\)\s*$/, "")
+    .replace(/\s*\[SSH:[^\]]+\]\s*$/, "")
+    .replace(/\s*\[(Restricted Mode|Read Only|Unsupported)\]\s*$/, "")
+    .trim();
+
   // Pattern: "... — /absolute/path"
-  const abs = title.match(/[—-]\s*(\/[^—\n]+)$/);
+  const abs = cleanTitle.match(/[\-—–]\s*(\/[^—–\n]+)$/);
   if (abs && existsSync(abs[1]!.trim())) return abs[1]!.trim();
 
   // Pattern: "... — name" → try ~/Work/name, ~/Code/name, ~/Projects/name, ~/src/name
-  const tail = title.match(/[—-]\s*([^—\n]+?)$/);
+  const tail = cleanTitle.match(/[\-—–]\s*([^—–\n]+?)$/);
   const candidate = tail?.[1]?.trim();
   if (candidate) {
     for (const root of ["Work", "Code", "Projects", "src", "dev"]) {
