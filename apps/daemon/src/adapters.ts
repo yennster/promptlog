@@ -213,11 +213,24 @@ export function extractAssistantResponse(
 ): string {
   if (!blob) return "";
   let text = blob;
-  // Anchor on the user's own prompt if we can find it — everything after that
-  // in the linearized AX tree is the new assistant turn.
+  // Anchor on the user's own prompt if we can find it AS A STANDALONE LINE —
+  // that signals a user-message bubble (separately rendered AXStaticText),
+  // not an echo of the prompt inside the assistant's response. Without this
+  // guard, prompt="asdf" against response "You typed: asdfasd" would slice
+  // mid-word and leave just "asd".
   if (promptText) {
-    const i = text.lastIndexOf(promptText);
-    if (i >= 0) text = text.slice(i + promptText.length);
+    const promptLine = promptText.trim();
+    const lines = text.split("\n");
+    let anchor = -1;
+    for (let i = lines.length - 1; i >= 0; i--) {
+      if (lines[i].trim() === promptLine) {
+        anchor = i;
+        break;
+      }
+    }
+    if (anchor >= 0) {
+      text = lines.slice(anchor + 1).join("\n");
+    }
   }
   return stripChrome(app, text);
 }

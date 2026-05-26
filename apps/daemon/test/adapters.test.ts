@@ -139,6 +139,48 @@ test("extractAssistantResponse anchors on prompt and strips chrome", () => {
   assert.equal(result, "Bananas are berries, but strawberries aren't.");
 });
 
+test("extractAssistantResponse — prompt anchor only matches full lines, not mid-sentence", () => {
+  // Regression: prior lastIndexOf-based anchor would slice mid-word when the
+  // response happened to contain the prompt characters. Prompt "asdf" against
+  // ChatGPT's literal-echo response "You typed: asdfasd" would slice everything
+  // before the second "asdf" and return just "asd". The line-anchored version
+  // skips that match because "You typed: asdfasd" isn't equal to "asdf".
+  const blob = "You typed: asdfasd";
+  const result = extractAssistantResponse("chatgpt", blob, "asdf");
+  assert.equal(result, "You typed: asdfasd");
+});
+
+test("extractAssistantResponse — prompt anchor still works for whole-line user bubble", () => {
+  // The line-anchor change shouldn't regress the normal case: Claude desktop's
+  // huge linearized blob has the user prompt as its own AXStaticText line,
+  // followed by the assistant turn. That line should still anchor.
+  const blob = [
+    "What is 2+2?",
+    "4",
+    "Copy message",
+  ].join("\n");
+  const result = extractAssistantResponse("claude", blob, "What is 2+2?");
+  assert.equal(result, "4");
+});
+
+test("extractAssistantResponse — prompt appearing only mid-prose preserves full response", () => {
+  // Prompt is a substring of a sentence in the response but never appears as
+  // its own line. The blob should pass through untouched (minus chrome).
+  const blob = [
+    "Sure! Here's a quicksort implementation written in JavaScript:",
+    "function quicksort(arr) { return arr.sort(); }",
+  ].join("\n");
+  const result = extractAssistantResponse(
+    "chatgpt",
+    blob,
+    "Write a quicksort",
+  );
+  assert.equal(
+    result,
+    "Sure! Here's a quicksort implementation written in JavaScript:\nfunction quicksort(arr) { return arr.sort(); }",
+  );
+});
+
 test("extractAssistantResponse — multi-line response survives", () => {
   const blob = [
     "Tell me a story",  // prompt
