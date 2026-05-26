@@ -59,7 +59,7 @@ export function activeSession() {
 }
 
 export function listSessions(limit = 100) {
-  return db
+  const rows = db
     .select({
       session: sessions,
       promptCount: sql<number>`(
@@ -69,11 +69,23 @@ export function listSessions(limit = 100) {
         SELECT COALESCE(SUM(${prompts.estCostUsd}), 0)
         FROM ${prompts} WHERE ${prompts.sessionId} = ${sessions.id}
       )`,
+      // Comma-separated list of distinct apps used in the session — empty
+      // string when no prompts yet. Parsed into a TargetApp[] before return.
+      appsRaw: sql<string>`(
+        SELECT COALESCE(GROUP_CONCAT(DISTINCT ${prompts.app}), '')
+        FROM ${prompts} WHERE ${prompts.sessionId} = ${sessions.id}
+      )`,
     })
     .from(sessions)
     .orderBy(desc(sessions.startedAt))
     .limit(limit)
     .all();
+  return rows.map(({ appsRaw, ...rest }) => ({
+    ...rest,
+    apps: appsRaw
+      ? (appsRaw.split(",").filter(Boolean) as TargetApp[])
+      : ([] as TargetApp[]),
+  }));
 }
 
 export function getSession(id: number) {

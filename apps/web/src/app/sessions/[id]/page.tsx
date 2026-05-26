@@ -11,7 +11,9 @@ import {
 import { buttonVariants } from "@/components/ui/button";
 import { cn, formatDateTime, formatDuration } from "@/lib/utils";
 import { PromptList } from "@/components/prompt-list";
+import { AppBadge } from "@/components/app-badge";
 import { DeleteSessionButton } from "@/components/delete-session-button";
+import type { TargetApp } from "@promptlog/shared";
 
 export const dynamic = "force-dynamic";
 
@@ -29,6 +31,19 @@ export default async function SessionPage({
   const duration = session.endedAt
     ? session.endedAt.getTime() - session.startedAt.getTime()
     : Date.now() - session.startedAt.getTime();
+
+  // Per-app breakdown: how many prompts came from each tool during this
+  // session. Sessions can mix multiple apps, so this surfaces the split at
+  // the top instead of forcing the user to scan every row.
+  const promptsByApp = promptList.reduce<Record<TargetApp, number>>(
+    (acc, p) => {
+      acc[p.app] = (acc[p.app] ?? 0) + 1;
+      return acc;
+    },
+    {} as Record<TargetApp, number>,
+  );
+  const appEntries = (Object.entries(promptsByApp) as [TargetApp, number][])
+    .sort((a, b) => b[1] - a[1]);
 
   return (
     <div className="mx-auto max-w-6xl p-6 space-y-6">
@@ -73,9 +88,30 @@ export default async function SessionPage({
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
         <Stat label="Prompts" value={promptList.length} />
         <Stat label="Duration" value={formatDuration(duration)} />
+        <Card>
+          <CardContent className="p-4">
+            <div className="text-xs uppercase tracking-wider text-muted-foreground">
+              Apps used
+            </div>
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              {appEntries.length === 0 ? (
+                <span className="text-sm text-muted-foreground">—</span>
+              ) : (
+                appEntries.map(([app, count]) => (
+                  <div key={app} className="flex items-center gap-1.5">
+                    <AppBadge app={app} />
+                    <span className="text-sm tabular-nums text-muted-foreground">
+                      × {count}
+                    </span>
+                  </div>
+                ))
+              )}
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       <Card>

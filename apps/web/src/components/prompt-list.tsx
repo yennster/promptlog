@@ -3,8 +3,7 @@
 import { useState } from "react";
 import { ChevronRight } from "lucide-react";
 import type { Prompt } from "@promptlog/db";
-import { TARGET_APP_LABEL } from "@promptlog/shared";
-import { Badge } from "@/components/ui/badge";
+import { AppBadge } from "@/components/app-badge";
 import { cn, formatDuration, truncate } from "@/lib/utils";
 
 function formatRowTime(d: Date) {
@@ -41,9 +40,7 @@ export function PromptList({ prompts }: { prompts: Prompt[] }) {
               <span className="whitespace-nowrap text-muted-foreground">
                 {formatRowTime(p.sentAt)}
               </span>
-              <Badge variant="outline" className="justify-self-start">
-                {TARGET_APP_LABEL[p.app]}
-              </Badge>
+              <AppBadge app={p.app} className="justify-self-start" />
               <span className="whitespace-nowrap text-muted-foreground">
                 {formatDuration(p.latencyMs)}
               </span>

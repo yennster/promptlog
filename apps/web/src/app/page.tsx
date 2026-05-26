@@ -3,6 +3,7 @@ import { activeSession, listSessions } from "@promptlog/db/queries";
 import { sendToDaemon } from "@/lib/daemon-client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { AppBadge } from "@/components/app-badge";
 import { RecordPill } from "@/components/record-pill";
 import { DeleteSessionButton } from "@/components/delete-session-button";
 import { formatDateTime, formatDuration } from "@/lib/utils";
@@ -78,6 +79,7 @@ export default async function HomePage() {
                   <th className="px-6 py-2 text-left font-medium">Started</th>
                   <th className="px-6 py-2 text-left font-medium">Duration</th>
                   <th className="px-6 py-2 text-left font-medium">Prompts</th>
+                  <th className="px-6 py-2 text-left font-medium">Apps</th>
                   <th className="px-6 py-2 text-left font-medium">Context</th>
                   <th className="px-6 py-2 text-left font-medium">Status</th>
                   <th className="px-2 py-2 font-medium"></th>
@@ -109,6 +111,17 @@ export default async function HomePage() {
                         {formatDuration(duration)}
                       </td>
                       <td className="px-6 py-3">{row.promptCount}</td>
+                      <td className="px-6 py-3">
+                        {row.apps.length === 0 ? (
+                          <span className="text-muted-foreground">—</span>
+                        ) : (
+                          <div className="flex flex-wrap gap-1">
+                            {row.apps.map((a) => (
+                              <AppBadge key={a} app={a} />
+                            ))}
+                          </div>
+                        )}
+                      </td>
                       <td className="px-6 py-3 text-muted-foreground">
                         {s.projectContext ?? "—"}
                       </td>
