@@ -219,17 +219,62 @@ func conversationRoot(_ app: AXUIElement) -> AXUIElement? {
 // Last assistant message: the *last* large AXGroup / AXStaticText cluster
 // inside the conversation root. Heuristic, but works well enough for Electron
 // chat apps where each message is its own AXGroup.
+//
+// First pass: look for AXGroups whose AXDescription is one of a small set of
+// known "assistant message" labels (Antigravity exposes "Agent response", for
+// example). These give a clean, scoped subtree that doesn't include composer
+// chrome.
+//
+// Second pass (fallback): the original heuristic — last AXGroup with >= 40
+// chars of text. Used for apps like Claude desktop that don't label bubbles.
+let ASSISTANT_LABELS: Set<String> = [
+    "Agent response",   // Antigravity
+    "Assistant message",
+    "Assistant response",
+]
+let USER_LABELS: Set<String> = [
+    "User message",     // Antigravity
+    "Your message",
+]
+
+func findAllMatching(
+    _ root: AXUIElement,
+    limit: Int = 200,
+    predicate: (AXUIElement) -> Bool
+) -> [AXUIElement] {
+    var out: [AXUIElement] = []
+    walk(root) { el, _ in
+        if out.count >= limit { return false }
+        if predicate(el) { out.append(el) }
+        return true
+    }
+    return out
+}
+
 func lastAssistantText(_ app: AXUIElement) -> String? {
     guard let root = conversationRoot(app) else { return nil }
+
+    // First pass: labeled assistant-message groups.
+    let labeled = findAllMatching(root) { el in
+        guard let role = stringAttribute(el, kAXRoleAttribute),
+              role == kAXGroupRole else { return false }
+        let desc = stringAttribute(el, kAXDescriptionAttribute) ?? ""
+        return ASSISTANT_LABELS.contains(desc)
+    }
+    if let last = labeled.last {
+        let text = collectText(last, limit: 16_000)
+        if !text.isEmpty { return text }
+    }
+
+    // Fallback: largest-group heuristic.
     let groups = findAll(root, roles: [kAXGroupRole, "AXArticle"], limit: 400)
-    // Walk in reverse, picking the last group that contains substantial text.
     for group in groups.reversed() {
         let text = collectText(group, limit: 16_000)
         if text.count >= 40 {
             return text
         }
     }
-    // Fallback: full conversation text minus the composer text.
+    // Final fallback: full conversation text minus the composer text.
     let full = collectText(root)
     if let composer = composerElement(app), let c = stringAttribute(composer, kAXValueAttribute) {
         return full.replacingOccurrences(of: c, with: "")

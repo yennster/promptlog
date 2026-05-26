@@ -156,6 +156,51 @@ test("extractAssistantResponse — multi-line response survives", () => {
   );
 });
 
+test("antigravity: strips Agent response label + bubble chrome", () => {
+  const blob = [
+    "Agent response",
+    "It looks like your message might have been a typo.",
+    "How can I help you today?",
+    "9:57 PM",
+    "Copy",
+    "Good response",
+    "Bad response",
+  ].join("\n");
+  const result = stripChrome("antigravity", blob);
+  assert.equal(
+    result,
+    "It looks like your message might have been a typo.\nHow can I help you today?",
+  );
+});
+
+test("codex: strips per-message chrome and model badge", () => {
+  const blob = [
+    "Edit user message",
+    "laskdfjlsdkjf",
+    "9:58 PM",
+    "Copy message",
+    "Edit message",
+    "I'm here. What would you like me to do?",
+    "Copy",
+    "Good response",
+    "Bad response",
+    "Fork from this point",
+    "9:58 PM",
+    "Ask for follow-up changes",
+    "Add files and more",
+    "Auto-review",
+    "5.5 Extra High",
+    "5.5",
+    "Extra High",
+    "Dictate",
+  ].join("\n");
+  const result = stripChrome("codex", blob);
+  assert.equal(
+    result,
+    "laskdfjlsdkjf\nI'm here. What would you like me to do?",
+  );
+});
+
 test("extractAssistantResponse — prose containing chrome-word survives", () => {
   // Regression: earlier filters used /\bRetry\b/g which would strip the word
   // out of real prose. Make sure the new line-based filter doesn't.

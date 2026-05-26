@@ -72,8 +72,23 @@ const RESPONSE_NOISE: Record<TargetApp, RegExp[]> = {
     /Send a message/g,
     /ChatGPT can make mistakes[^\n]*/g,
   ],
-  codex: [],
-  antigravity: [],
+  codex: [
+    /^\s*\d{1,2}:\d{2}\s*(AM|PM)\s*$/gm,
+    // Codex renders model badges like "5.5 Extra High" — also surfaces as
+    // separate lines "5.5" and "Extra High".
+    /^\d+(\.\d+)?\s+(Extra )?(High|Standard|Low)$/gm,
+    // Codex wraps each message in an AXGroup whose AXDescription is a single
+    // string concatenating chrome + prompt + response + chrome ("Edit user
+    // message 9:58 PM Copy message Edit message <response> Copy Good response
+    // Bad response Fork from this point..."). That description leaks into
+    // collectText as one giant line. The per-element AXStaticText nodes
+    // already give us the structured pieces, so drop the combined-desc line.
+    /^Edit user message .+$/gm,
+  ],
+  antigravity: [
+    /^\s*\d{1,2}:\d{2}\s*(AM|PM)\s*$/gm,
+    /^Gemini \d[\.\d]*\s*(Flash|Pro)?\s*(\(.*\))?$/gm,
+  ],
 };
 
 // Chrome labels that get their own line in the AX tree (toolbar/control buttons
@@ -134,8 +149,35 @@ const CHROME_LINES: Record<TargetApp, Set<string>> = {
     "Arrow keys move the tile. Perpendicular arrows preview a split; press Enter to commit or Escape to cancel.",
   ]),
   chatgpt: new Set(["Copy", "Regenerate"]),
-  codex: new Set(),
-  antigravity: new Set(),
+  codex: new Set([
+    "Copy",
+    "Copy message",
+    "Edit message",
+    "Edit user message",
+    "Good response",
+    "Bad response",
+    "Fork from this point",
+    "Ask for follow-up changes",
+    "Add files and more",
+    "Auto-review",
+    "Dictate",
+    "Outputs",
+    "Sources",
+    "No artifacts yet",
+    "No sources yet",
+  ]),
+  antigravity: new Set([
+    // The AXGroup's own description ("Agent response") leaks into collectText.
+    "Agent response",
+    "User message",
+    "Copy",
+    "Good response",
+    "Bad response",
+    "Message input",
+    "Ask anything, @ to mention, / for actions",
+    "Add context",
+    "Record voice memo",
+  ]),
 };
 
 // Strip UI chrome from an AX-tree text blob without doing the prompt-anchor
