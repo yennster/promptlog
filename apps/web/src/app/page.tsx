@@ -4,7 +4,7 @@ import { sendToDaemon } from "@/lib/daemon-client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { AppBadge } from "@/components/app-badge";
-import { RecordPill } from "@/components/record-pill";
+
 import { DeleteSessionButton } from "@/components/delete-session-button";
 import { formatDateTime, formatDuration } from "@/lib/utils";
 
@@ -24,10 +24,9 @@ export default async function HomePage() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Sessions</h1>
           <p className="text-sm text-muted-foreground">
-            Press record to start auditing prompts in your AI desktop apps.
+            Audit your local prompts to Claude, ChatGPT, Codex, and Antigravity.
           </p>
         </div>
-        <RecordPill activeSessionId={active?.id ?? null} />
       </header>
 
       {!daemonOk && (
