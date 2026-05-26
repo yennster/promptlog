@@ -40,10 +40,19 @@ export class CaptureLoop {
   start(sessionId: number) {
     this.activeSessionId = sessionId;
     this.state.clear();
+    const enabled = (Object.keys(this.settings.enabledApps) as TargetApp[])
+      .filter((a) => this.settings.enabledApps[a])
+      .join(", ");
+    console.log(
+      `[capture] session ${sessionId} started, polling: ${enabled || "(none)"}`,
+    );
     this.tickSoon(50);
   }
 
   stop() {
+    if (this.activeSessionId !== null) {
+      console.log(`[capture] session ${this.activeSessionId} stopped`);
+    }
     this.activeSessionId = null;
     // Don't clear state — keep last-known values so we don't double-record
     // if a session is started again on the same app text.
@@ -98,8 +107,18 @@ export class CaptureLoop {
   private async tickApp(app: TargetApp) {
     const snap = await snapshotApp(this.client, app);
     if (!snap || !snap.ok) return;
+    const isFirstSnap = !this.state.has(app);
     const prior = this.prior(app);
     const now = Date.now();
+
+    if (isFirstSnap && this.activeSessionId !== null) {
+      console.log(
+        `[capture] ${app}: first snapshot ` +
+          `(composer=${snap.composer.length}, ` +
+          `assistant=${snap.lastAssistantText.length}, ` +
+          `userBubble=${snap.lastUserText.length})`,
+      );
+    }
 
     // Primary detector: composer transitioned from non-empty to empty.
     const composerSent =
@@ -124,6 +143,10 @@ export class CaptureLoop {
     const sent = composerSent || userBubbleSent;
     if (sent) {
       const promptText = composerSent ? prior.composer : snap.lastUserText;
+      console.log(
+        `[capture] ${app}: prompt detected via ${composerSent ? "composer" : "userBubble"} ` +
+          `(${promptText.length} chars): "${promptText.slice(0, 60).replace(/\n/g, " ")}"`,
+      );
       const cwdGuess = currentGuess();
       const inTokens = estimateTokens(promptText, app);
       const inCost = estimateCostUsd(app, inTokens, 0, this.settings.costRates);

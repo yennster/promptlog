@@ -33,7 +33,7 @@ async function buildStatus(): Promise<DaemonStatus> {
   };
 }
 
-startSocketServer(async (req): Promise<DaemonResponse> => {
+await startSocketServer(async (req): Promise<DaemonResponse> => {
   switch (req.kind) {
     case "status":
       return { ok: true, status: await buildStatus() };

@@ -1,4 +1,4 @@
-import { createServer, type Socket } from "node:net";
+import { createConnection, createServer, type Socket } from "node:net";
 import { mkdirSync, unlinkSync } from "node:fs";
 import { dirname } from "node:path";
 import {
@@ -9,8 +9,42 @@ import {
 
 export type Handler = (req: DaemonRequest) => Promise<DaemonResponse>;
 
-export function startSocketServer(handler: Handler) {
+// Probe the existing socket (if any) to see if a daemon is already listening.
+// On tsx-watch reload the previous process can survive briefly while the new
+// one starts up. Without this check the new daemon happily unlinks the socket
+// file and creates a new one — but the old process is still bound to its own
+// inode, still polling, still consuming an active session. Web requests then
+// race between the two daemons. Ping-then-block fixes that.
+async function pingExisting(): Promise<boolean> {
+  return new Promise((resolve) => {
+    const sock = createConnection(DAEMON_SOCKET_PATH);
+    const done = (result: boolean) => {
+      try {
+        sock.destroy();
+      } catch {
+        /* noop */
+      }
+      resolve(result);
+    };
+    sock.on("connect", () => {
+      sock.write(JSON.stringify({ kind: "status" }) + "\n");
+    });
+    sock.on("data", () => done(true));
+    sock.on("error", () => done(false));
+    setTimeout(() => done(false), 500);
+  });
+}
+
+export async function startSocketServer(handler: Handler) {
   mkdirSync(dirname(DAEMON_SOCKET_PATH), { recursive: true });
+  if (await pingExisting()) {
+    console.error(
+      `[daemon] another daemon is already listening on ${DAEMON_SOCKET_PATH}. ` +
+        `Refusing to start so we don't race for AX captures. Run \`pkill -f "tsx.*daemon"\` ` +
+        `to clean up the orphan, then restart.`,
+    );
+    process.exit(1);
+  }
   try {
     unlinkSync(DAEMON_SOCKET_PATH);
   } catch {
