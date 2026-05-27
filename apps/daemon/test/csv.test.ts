@@ -29,9 +29,6 @@ function prompt(id: number, overrides: Partial<Prompt> = {}): Prompt {
     firstTokenAt: null,
     completedAt: new Date("2026-05-26T20:05:08Z"),
     latencyMs: 8000,
-    estPromptTokens: 12,
-    estResponseTokens: 142,
-    estCostUsd: 0.0034,
     detectedCwd: "~/Work/promptlog",
     ...overrides,
   };
@@ -42,7 +39,7 @@ test("buildSessionsCsv — header row uses stable column order", () => {
   const [header] = csv.split("\n");
   assert.equal(
     header,
-    "session_id,session_name,session_started_at,session_ended_at,project_context,prompt_id,sent_at,completed_at,app,latency_ms,est_prompt_tokens,est_response_tokens,est_cost_usd,detected_cwd,prompt_text,response_snippet",
+    "session_id,session_name,session_started_at,session_ended_at,project_context,prompt_id,sent_at,completed_at,app,latency_ms,detected_cwd,prompt_text,response_snippet",
   );
 });
 
@@ -78,7 +75,7 @@ test("buildSessionsCsv — empty session emits a row with blank prompt cells", (
   // First five columns (session fields) should be populated, remaining empty.
   assert.equal(cells[0], "7");
   assert.equal(cells[5], "", "prompt_id should be empty for empty session");
-  assert.equal(cells[14], "", "prompt_text should be empty for empty session");
+  assert.equal(cells[11], "", "prompt_text should be empty for empty session");
 });
 
 test("buildSessionsCsv — multi-session export preserves session ordering", () => {
@@ -117,6 +114,6 @@ test("buildSessionsCsv — null fields render as empty cells", () => {
   assert.equal(cells[4], "", "project_context empty");
   assert.equal(cells[7], "", "completed_at empty");
   assert.equal(cells[9], "", "latency_ms empty");
-  assert.equal(cells[13], "", "detected_cwd empty");
-  assert.equal(cells[15], "", "response_snippet empty");
+  assert.equal(cells[10], "", "detected_cwd empty");
+  assert.equal(cells[12], "", "response_snippet empty");
 });

@@ -54,8 +54,6 @@ test("Database Lifecycle — creation, prompt ingestion, FTS search, and deletio
     app: "claude",
     promptText: "How do I build a monorepo with pnpm?",
     sentAt: new Date(),
-    estPromptTokens: 10,
-    estCostUsd: 0.0003,
   });
   assert.ok(prompt1.id > 0);
   assert.equal(prompt1.promptText, "How do I build a monorepo with pnpm?");
@@ -65,8 +63,6 @@ test("Database Lifecycle — creation, prompt ingestion, FTS search, and deletio
     app: "chatgpt",
     promptText: "Write a quicksort in JavaScript",
     sentAt: new Date(),
-    estPromptTokens: 12,
-    estCostUsd: 0.0004,
   });
 
   // Verify prompts exist in FTS
@@ -80,8 +76,6 @@ test("Database Lifecycle — creation, prompt ingestion, FTS search, and deletio
     responseSnippet: "Use a pnpm-workspace.yaml file...",
     completedAt: new Date(),
     latencyMs: 1200,
-    estResponseTokens: 40,
-    estCostUsd: 0.001,
   });
 
   // Verify update mirrored to FTS
@@ -106,7 +100,6 @@ test("Database Lifecycle — creation, prompt ingestion, FTS search, and deletio
   assert.equal(sessionsList.length, 1);
   assert.equal(sessionsList[0].session.id, session.id);
   assert.equal(sessionsList[0].promptCount, 2);
-  assert.ok(sessionsList[0].totalCost > 0);
   assert.deepEqual(sessionsList[0].apps.sort(), ["chatgpt", "claude"]);
 
   // 7. Large deletion test (verifying subquery delete works under FTS and doesn't hit variable limits)

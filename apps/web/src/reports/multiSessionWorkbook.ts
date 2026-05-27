@@ -22,11 +22,9 @@ export async function buildMultiSessionWorkbook(
     { header: "Ended", key: "ended", width: 22 },
     { header: "Project context", key: "ctx", width: 30 },
     { header: "Prompts", key: "n", width: 10 },
-    { header: "Total cost (USD)", key: "cost", width: 16 },
   ];
   summary.getRow(1).font = { bold: true };
   for (const { session, prompts } of bundles) {
-    const cost = prompts.reduce((a, p) => a + (p.estCostUsd ?? 0), 0);
     summary.addRow({
       id: session.id,
       name: session.name,
@@ -34,7 +32,6 @@ export async function buildMultiSessionWorkbook(
       ended: session.endedAt ?? "(in progress)",
       ctx: session.projectContext ?? "",
       n: prompts.length,
-      cost: cost > 0 ? Number(cost.toFixed(6)) : null,
     });
   }
 
@@ -45,7 +42,6 @@ export async function buildMultiSessionWorkbook(
     { header: "Sent at", key: "sent_at", width: 22 },
     { header: "App", key: "app", width: 12 },
     { header: "Latency (ms)", key: "latency", width: 14 },
-    { header: "Cost (USD)", key: "cost", width: 12 },
     { header: "Detected cwd", key: "cwd", width: 36 },
     { header: "Prompt", key: "prompt", width: 80 },
     { header: "Response snippet", key: "response", width: 80 },
@@ -59,7 +55,6 @@ export async function buildMultiSessionWorkbook(
         sent_at: p.sentAt,
         app: TARGET_APP_LABEL[p.app],
         latency: p.latencyMs ?? null,
-        cost: p.estCostUsd ?? null,
         cwd: p.detectedCwd ?? "",
         prompt: p.promptText,
         response: p.responseSnippet ?? "",
@@ -75,7 +70,6 @@ export async function buildMultiSessionWorkbook(
     { header: "App", key: "app", width: 14 },
     { header: "Prompts", key: "n", width: 10 },
     { header: "Avg latency (ms)", key: "lat", width: 18 },
-    { header: "Total cost (USD)", key: "cost", width: 16 },
   ];
   byApp.getRow(1).font = { bold: true };
   const apps: TargetApp[] = ["claude", "chatgpt", "codex", "antigravity"];
@@ -88,12 +82,10 @@ export async function buildMultiSessionWorkbook(
     const avg = lat.length
       ? Math.round(lat.reduce((a, b) => a + b) / lat.length)
       : null;
-    const cost = rows.reduce((a, p) => a + (p.estCostUsd ?? 0), 0);
     byApp.addRow({
       app: TARGET_APP_LABEL[app],
       n: rows.length,
       lat: avg,
-      cost: cost > 0 ? Number(cost.toFixed(6)) : null,
     });
   }
 

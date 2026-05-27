@@ -52,9 +52,6 @@ export function MultiSessionReport({
   generatedAt,
 }: MultiSessionReportProps) {
   const totalPrompts = bundles.reduce((a, b) => a + b.prompts.length, 0);
-  const totalCost = bundles
-    .flatMap((b) => b.prompts)
-    .reduce((a, p) => a + (p.estCostUsd ?? 0), 0);
 
   return (
     <Document>
@@ -65,7 +62,6 @@ export function MultiSessionReport({
         </Text>
         <Text style={styles.sub}>
           Generated {generatedAt.toLocaleString()} · {totalPrompts} prompts
-          {totalCost > 0 ? ` · est. $${totalCost.toFixed(4)}` : ""}
         </Text>
 
         {bundles.map(({ session, prompts }) => {

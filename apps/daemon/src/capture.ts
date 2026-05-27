@@ -2,7 +2,6 @@ import { insertPrompt, updatePromptResponse } from "@promptlog/db/queries";
 import type { TargetApp } from "@promptlog/shared";
 import type { AxClient } from "./ax.js";
 import { extractAssistantResponse, snapshotApp, stripChrome } from "./adapters.js";
-import { estimateCostUsd, estimateTokens } from "./cost.js";
 import { currentGuess, refreshFocus } from "./cwd.js";
 import { readDaemonSettings } from "./settings.js";
 
@@ -125,15 +124,11 @@ export class CaptureLoop {
     baselineAssistant: string,
   ) {
     const cwdGuess = currentGuess();
-    const inTokens = estimateTokens(promptText, app);
-    const inCost = estimateCostUsd(app, inTokens, 0, this.settings.costRates);
     const inserted = insertPrompt({
       sessionId: this.activeSessionId!,
       app,
       promptText,
       sentAt: new Date(sentAtMs),
-      estPromptTokens: inTokens,
-      estCostUsd: inCost,
       detectedCwd: cwdGuess?.path ?? null,
     });
     prior.pendingPromptId = inserted.id;
@@ -370,21 +365,11 @@ export class CaptureLoop {
         (hasContent || timedOut)
       ) {
         const responseText = candidateResponse;
-        const outTokens = estimateTokens(responseText, app);
-        const inTokens = estimateTokens(prior.pendingPromptText, app);
-        const totalCost = estimateCostUsd(
-          app,
-          inTokens,
-          outTokens,
-          this.settings.costRates,
-        );
         updatePromptResponse(prior.pendingPromptId, {
           responseSnippet: responseText.slice(0, 1000),
           completedAt: new Date(now),
           firstTokenAt: new Date(prior.pendingPromptSentAt),
           latencyMs: now - prior.pendingPromptSentAt,
-          estResponseTokens: outTokens,
-          estCostUsd: totalCost,
         });
         prior.pendingPromptId = null;
         prior.pendingPromptText = "";

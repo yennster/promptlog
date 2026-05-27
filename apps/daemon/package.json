@@ -14,12 +14,10 @@
     "ax:replay": "tsx tools/ax-debug.ts replay"
   },
   "dependencies": {
-    "@anthropic-ai/tokenizer": "^0.0.4",
     "@promptlog/db": "workspace:*",
     "@promptlog/shared": "workspace:*",
     "better-sqlite3": "^11.7.0",
-    "drizzle-orm": "^0.38.2",
-    "gpt-tokenizer": "^2.8.1"
+    "drizzle-orm": "^0.38.2"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.12",

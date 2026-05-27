@@ -15,7 +15,6 @@ import { DynamicDuration } from "@/components/dynamic-duration";
 export interface SessionRow {
   session: Session;
   promptCount: number;
-  totalCost: number;
   apps: TargetApp[];
 }
 

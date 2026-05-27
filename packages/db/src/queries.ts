@@ -89,10 +89,6 @@ export function listSessions(limit = 100) {
       promptCount: sql<number>`(
         SELECT COUNT(*) FROM ${prompts} WHERE ${prompts.sessionId} = ${sessionIdRef}
       )`,
-      totalCost: sql<number>`(
-        SELECT COALESCE(SUM(${prompts.estCostUsd}), 0)
-        FROM ${prompts} WHERE ${prompts.sessionId} = ${sessionIdRef}
-      )`,
       // Comma-separated list of distinct apps used in the session — empty
       // string when no prompts yet. Parsed into a TargetApp[] before return.
       appsRaw: sql<string>`(
@@ -143,8 +139,6 @@ export function updatePromptResponse(
     firstTokenAt?: Date | null;
     completedAt?: Date | null;
     latencyMs?: number | null;
-    estResponseTokens?: number | null;
-    estCostUsd?: number | null;
   },
 ) {
   const updated = db
@@ -240,9 +234,6 @@ function rowToPrompt(r: Record<string, unknown>) {
     firstTokenAt: r.first_token_at ? new Date(r.first_token_at as number) : null,
     completedAt: r.completed_at ? new Date(r.completed_at as number) : null,
     latencyMs: r.latency_ms as number | null,
-    estPromptTokens: r.est_prompt_tokens as number | null,
-    estResponseTokens: r.est_response_tokens as number | null,
-    estCostUsd: r.est_cost_usd as number | null,
     detectedCwd: r.detected_cwd as string | null,
   };
 }

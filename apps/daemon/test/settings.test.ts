@@ -11,24 +11,18 @@ import assert from "node:assert/strict";
 
 // Dynamic import to prevent ESM import hoisting from reading the real HOME
 const { readDaemonSettings } = await import("../src/settings.js");
-const { DEFAULT_COST_RATES, SETTINGS_PATH } = await import("@promptlog/shared");
+const { SETTINGS_PATH } = await import("@promptlog/shared");
 
 test("readDaemonSettings — returns defaults when settings.json does not exist", () => {
   const settings = readDaemonSettings();
-  assert.deepEqual(settings.costRates, DEFAULT_COST_RATES);
   assert.equal(settings.enabledApps.claude, true);
   assert.equal(settings.enabledApps.antigravity, true);
 });
 
-test("readDaemonSettings — correctly deep-merges partially customized rates", () => {
-  // Ensure the directory for the settings path exists
+test("readDaemonSettings — merges enabledApps overrides", () => {
   mkdirSync(join(tempHome, ".promptlog"), { recursive: true });
 
-  // Customizing ONLY Claude's input rate
   const customConfig = {
-    costRates: {
-      claude: { input: 12.34 },
-    },
     enabledApps: {
       chatgpt: false,
     },
@@ -38,20 +32,11 @@ test("readDaemonSettings — correctly deep-merges partially customized rates", 
 
   try {
     const settings = readDaemonSettings();
-
-    // Verify deep merge: Claude input is custom, Claude output is default!
-    assert.equal(settings.costRates.claude.input, 12.34);
-    assert.equal(settings.costRates.claude.output, DEFAULT_COST_RATES.claude.output);
-
-    // Verify other apps are unaffected and retain their default rates
-    assert.equal(settings.costRates.chatgpt.input, DEFAULT_COST_RATES.chatgpt.input);
-    assert.equal(settings.costRates.chatgpt.output, DEFAULT_COST_RATES.chatgpt.output);
-
-    // Verify enabledApps are merged correctly
     assert.equal(settings.enabledApps.chatgpt, false);
-    assert.equal(settings.enabledApps.claude, true); // default
+    assert.equal(settings.enabledApps.claude, true);
+    assert.equal(settings.enabledApps.codex, true);
+    assert.equal(settings.enabledApps.antigravity, true);
   } finally {
-    // Cleanup settings file for this test
     rmSync(SETTINGS_PATH, { force: true });
   }
 });
@@ -62,10 +47,9 @@ test("readDaemonSettings — handles corrupted json elegantly", () => {
 
   try {
     const settings = readDaemonSettings();
-    assert.deepEqual(settings.costRates, DEFAULT_COST_RATES);
+    assert.equal(settings.enabledApps.claude, true);
   } finally {
     rmSync(SETTINGS_PATH, { force: true });
-    // Cleanup temporary directory
     rmSync(tempHome, { recursive: true, force: true });
   }
 });

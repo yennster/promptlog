@@ -1,7 +1,6 @@
 import { sql } from "drizzle-orm";
 import {
   integer,
-  real,
   sqliteTable,
   text,
   index,
@@ -34,9 +33,6 @@ export const prompts = sqliteTable(
     firstTokenAt: integer("first_token_at", { mode: "timestamp_ms" }),
     completedAt: integer("completed_at", { mode: "timestamp_ms" }),
     latencyMs: integer("latency_ms"),
-    estPromptTokens: integer("est_prompt_tokens"),
-    estResponseTokens: integer("est_response_tokens"),
-    estCostUsd: real("est_cost_usd"),
     detectedCwd: text("detected_cwd"),
   },
   (table) => ({
