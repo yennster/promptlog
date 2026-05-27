@@ -23,6 +23,9 @@ const EDITOR_BUNDLE_IDS = new Set([
   "com.googlecode.iterm2",
   "com.apple.finder",
   "com.google.antigravity",
+  "dev.zed.Zed",
+  "dev.zed.Zed-Shared",
+  "dev.zed.Zed-Preview",
 ]);
 
 export interface CwdGuess {

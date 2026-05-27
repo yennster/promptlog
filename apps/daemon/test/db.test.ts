@@ -180,6 +180,36 @@ test("searchPrompts — substring and prefix matches", () => {
   deleteSession(s.id);
 });
 
+test("searchPrompts — FTS app filtering respects limit correctly (limiting-after-filtering fix)", () => {
+  const s = createSession({ name: "FTS Limit Test" });
+  
+  // Insert 201 chatgpt prompts matching "integration"
+  for (let i = 0; i < 201; i++) {
+    insertPrompt({
+      sessionId: s.id,
+      app: "chatgpt",
+      promptText: `integration test for chatgpt ${i}`,
+      sentAt: new Date(),
+    });
+  }
+  
+  // Insert 1 claude prompt matching "integration"
+  const claudePrompt = insertPrompt({
+    sessionId: s.id,
+    app: "claude",
+    promptText: "integration test for claude",
+    sentAt: new Date(),
+  });
+
+  // Querying with app filter "claude" should successfully find the Claude prompt
+  // even though there are 201 ChatGPT matches exceeding the default FTS limit of 200.
+  const results = searchPrompts({ query: "integration", app: "claude" });
+  assert.equal(results.length, 1);
+  assert.equal(results[0].id, claudePrompt.id);
+
+  deleteSession(s.id);
+});
+
 test("rebuildFtsIndex — recovers from drift after raw-SQL insert", () => {
   const s = createSession({ name: "FTS Drift Test" });
   // Insert directly into the prompts table, bypassing insertPrompt's FTS

@@ -10,6 +10,7 @@ import { AppBadge } from "@/components/app-badge";
 import { DeleteSessionButton } from "@/components/delete-session-button";
 import { cn, formatDateTime, formatDuration } from "@/lib/utils";
 import { buttonVariants } from "@/components/ui/button";
+import { DynamicDuration } from "@/components/dynamic-duration";
 
 export interface SessionRow {
   session: Session;
@@ -213,7 +214,7 @@ export function SessionsTable({ rows }: { rows: SessionRow[] }) {
                   {formatDateTime(s.startedAt)}
                 </td>
                 <td className="px-6 py-3 text-muted-foreground">
-                  {formatDuration(duration)}
+                  <DynamicDuration startedAt={s.startedAt} endedAt={s.endedAt} />
                 </td>
                 <td className="px-6 py-3">{row.promptCount}</td>
                 <td className="px-6 py-3">

@@ -239,6 +239,25 @@ test("extractAssistantResponse — multi-line response survives", () => {
   );
 });
 
+test("extractAssistantResponse — multi-line prompt anchors correctly", () => {
+  const blob = [
+    "User message",
+    "Line 1 of prompt",
+    "Line 2 of prompt",
+    "12:00 PM",
+    "Copy message",
+    "Here is the response",
+    "to the multi-line prompt.",
+    "Copy message",
+  ].join("\n");
+  const prompt = "Line 1 of prompt\nLine 2 of prompt";
+  const result = extractAssistantResponse("claude", blob, prompt);
+  assert.equal(
+    result,
+    "Here is the response\nto the multi-line prompt.",
+  );
+});
+
 test("antigravity: stripChrome cleans the user-bubble text the daemon uses as a prompt fallback", () => {
   // collectText on the Antigravity "User message" group concatenates the
   // description label, the actual message text, the timestamp, and the

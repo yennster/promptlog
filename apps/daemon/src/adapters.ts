@@ -230,31 +230,50 @@ export function extractAssistantResponse(
 ): string {
   if (!blob) return "";
   let text = blob;
-  // Anchor on the user's own prompt if we can find it AS A STANDALONE LINE —
-  // that signals a user-message bubble (separately rendered AXStaticText),
-  // not an echo of the prompt inside the assistant's response.
+
+  // Anchor on the user's own prompt if we can find it at line boundaries.
+  // This signals a user-message bubble rather than an echo inside the response.
   if (promptText) {
-    const promptLine = promptText.trim();
-    const lines = text.split("\n");
-    let markedAnchor = -1;
-    let fallbackAnchor = -1;
-    for (let i = lines.length - 1; i >= 0; i--) {
-      if ((lines[i] ?? "").trim() !== promptLine) continue;
-      // Look back through immediately-preceding blank lines for a marker line.
-      let j = i - 1;
-      while (j >= 0 && (lines[j] ?? "").trim() === "") j--;
-      const prev = j >= 0 ? (lines[j] ?? "").trim() : "";
-      if (USER_BUBBLE_MARKERS.has(prev)) {
-        markedAnchor = i;
-        break;
+    const trimmedPrompt = promptText.trim();
+    let index = text.length;
+    let anchorIndex = -1;
+    let fallbackAnchorIndex = -1;
+
+    while (true) {
+      index = text.lastIndexOf(trimmedPrompt, index - 1);
+      if (index < 0) break;
+
+      // Ensure the matched prompt is bounded by line boundaries
+      const precededByLineBoundary = index === 0 || text[index - 1] === "\n";
+      const followedByLineBoundary =
+        index + trimmedPrompt.length === text.length ||
+        text[index + trimmedPrompt.length] === "\n";
+
+      if (precededByLineBoundary && followedByLineBoundary) {
+        // Look back through the preceding non-blank line to check for bubble markers
+        const before = text.slice(0, index).trim();
+        const beforeLines = before.split("\n");
+        const prevLine = beforeLines[beforeLines.length - 1]?.trim() ?? "";
+
+        if (USER_BUBBLE_MARKERS.has(prevLine)) {
+          anchorIndex = index;
+          break; // Found the best marker-matching anchor
+        }
+
+        if (fallbackAnchorIndex < 0) {
+          fallbackAnchorIndex = index;
+        }
       }
-      if (fallbackAnchor < 0) fallbackAnchor = i;
+
+      if (index === 0) break;
     }
-    const anchor = markedAnchor >= 0 ? markedAnchor : fallbackAnchor;
-    if (anchor >= 0) {
-      text = lines.slice(anchor + 1).join("\n");
+
+    const finalIndex = anchorIndex >= 0 ? anchorIndex : fallbackAnchorIndex;
+    if (finalIndex >= 0) {
+      text = text.slice(finalIndex + trimmedPrompt.length);
     }
   }
+
   return stripChrome(app, text);
 }
 

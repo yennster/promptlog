@@ -177,20 +177,43 @@ export function searchPrompts(filters: SearchFilters) {
   if (filters.query && filters.query.trim()) {
     // FTS path
     const escaped = filters.query.replaceAll('"', '""');
-    const ftsRows = sqlite
-      .prepare(
-        `SELECT rowid FROM prompts_fts WHERE prompts_fts MATCH ? ORDER BY rank LIMIT ?`,
-      )
-      .all(`"${escaped}"*`, limit) as { rowid: number }[];
-    const ids = ftsRows.map((r) => r.rowid);
-    if (ids.length === 0) return [];
-    const placeholders = ids.map(() => "?").join(",");
+    const ftsQuery = `"${escaped}"*`;
+
+    // Construct the SQL clauses and parameters dynamically to apply all search filters
+    // directly in SQLite during the FTS index joined query, avoiding the filter-after-limiting bug.
+    const clauses = ["f.prompts_fts MATCH ?"];
+    const params = [ftsQuery] as unknown[];
+
+    if (filters.app) {
+      clauses.push("p.app = ?");
+      params.push(filters.app);
+    }
+    if (filters.sessionId) {
+      clauses.push("p.session_id = ?");
+      params.push(filters.sessionId);
+    }
+    if (filters.from) {
+      clauses.push("p.sent_at >= ?");
+      params.push(filters.from.getTime());
+    }
+    if (filters.to) {
+      clauses.push("p.sent_at <= ?");
+      params.push(filters.to.getTime());
+    }
+
+    const whereClause = clauses.join(" AND ");
+    params.push(limit);
+
     const rows = sqlite
       .prepare(
-        `SELECT * FROM prompts WHERE id IN (${placeholders}) ORDER BY sent_at DESC`,
+        `SELECT p.* FROM prompts p
+         JOIN prompts_fts f ON p.id = f.rowid
+         WHERE ${whereClause}
+         ORDER BY p.sent_at DESC
+         LIMIT ?`,
       )
-      .all(...ids) as Array<Record<string, unknown>>;
-    return rows.map(rowToPrompt).filter((r) => matchesFilters(r, filters));
+      .all(...params) as Array<Record<string, unknown>>;
+    return rows.map(rowToPrompt);
   }
   const conditions = [] as ReturnType<typeof eq>[];
   if (filters.app) conditions.push(eq(prompts.app, filters.app));

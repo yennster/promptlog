@@ -47,6 +47,7 @@ export class CaptureLoop {
   private activeSessionId: number | null = null;
   private timer: NodeJS.Timeout | null = null;
   private running = false;
+  public autoSchedule = true;
 
   constructor(private readonly client: AxClient) {}
 
@@ -63,7 +64,9 @@ export class CaptureLoop {
     console.log(
       `[capture] session ${sessionId} started, polling: ${enabled || "(none)"}`,
     );
-    this.tickSoon(50);
+    if (this.autoSchedule) {
+      this.tickSoon(50);
+    }
   }
 
   stop() {
@@ -71,6 +74,10 @@ export class CaptureLoop {
       console.log(`[capture] session ${this.activeSessionId} stopped`);
     }
     this.activeSessionId = null;
+    if (this.timer) {
+      clearTimeout(this.timer);
+      this.timer = null;
+    }
     // Don't clear state — keep last-known values so we don't double-record
     // if a session is started again on the same app text.
   }
@@ -99,7 +106,9 @@ export class CaptureLoop {
       console.error("[capture] tick error:", e);
     } finally {
       this.running = false;
-      this.tickSoon(this.activeSessionId ? ACTIVE_POLL_MS : IDLE_POLL_MS);
+      if (this.activeSessionId !== null && this.autoSchedule) {
+        this.tickSoon(ACTIVE_POLL_MS);
+      }
     }
   }
 
@@ -187,16 +196,25 @@ export class CaptureLoop {
     //    labels these explicitly). The bubble appearing IS the confirmation,
     //    so we skip staging and insert directly.
     const composerSent =
+      !isFirstSnap &&
       prior.composer.length >= 2 &&
       snap.composer.length === 0 &&
       this.activeSessionId !== null;
 
+    // Guard: If the user is currently typing this text in the composer, it is an unsent draft!
+    const isTypingInComposer =
+      !!snap.composer &&
+      (snap.composer.trim().includes(cleanedUserBubble) ||
+        cleanedUserBubble.includes(snap.composer.trim()));
+
     const userBubbleSent =
+      !isFirstSnap &&
       !composerSent &&
       prior.pendingPromptId === null &&
       prior.candidatePromptText === "" &&
       cleanedUserBubble.length >= 2 &&
       cleanedUserBubble !== cleanedPriorUserBubble &&
+      !isTypingInComposer &&
       this.activeSessionId !== null;
 
     // Stage composerSent as a candidate prompt — don't insert yet.

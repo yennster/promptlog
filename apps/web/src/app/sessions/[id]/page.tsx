@@ -12,6 +12,7 @@ import { buttonVariants } from "@/components/ui/button";
 import { cn, formatDateTime, formatDuration } from "@/lib/utils";
 import { PromptList } from "@/components/prompt-list";
 import { AppBadge } from "@/components/app-badge";
+import { DynamicDuration } from "@/components/dynamic-duration";
 import { DeleteSessionButton } from "@/components/delete-session-button";
 import type { TargetApp } from "@promptlog/shared";
 
@@ -96,7 +97,10 @@ export default async function SessionPage({
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
         <Stat label="Prompts" value={promptList.length} />
-        <Stat label="Duration" value={formatDuration(duration)} />
+        <Stat
+          label="Duration"
+          value={<DynamicDuration startedAt={session.startedAt} endedAt={session.endedAt} />}
+        />
         <Card>
           <CardContent className="p-4">
             <div className="text-xs uppercase tracking-wider text-muted-foreground">
@@ -147,7 +151,7 @@ function Stat({
   value,
 }: {
   label: string;
-  value: string | number;
+  value: React.ReactNode;
 }) {
   return (
     <Card>
