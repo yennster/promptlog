@@ -98,6 +98,8 @@ const RESPONSE_NOISE: Record<TargetApp, RegExp[]> = {
   antigravity: [
     /^\s*\d{1,2}:\d{2}\s*(AM|PM)\s*$/gm,
     /^Gemini \d[\.\d]*\s*(Flash|Pro)?\s*(\(.*\))?$/gm,
+    // Attachment label that Antigravity prepends to user bubbles with media.
+    /^User uploaded media \d+$/gm,
   ],
 };
 
@@ -291,6 +293,107 @@ export function extractAssistantResponse(
   }
 
   return stripChrome(app, text);
+}
+
+// Attempt to recover a fuller version of a (potentially truncated) prompt from
+// the assistant text blob. The composer can be observed mid-typing or right at
+// the moment of submit between polls, giving us truncated text. Right after
+// submit, the AX tree's "last large text region" is often the user's just-sent
+// bubble — so the full prompt is there to be recovered.
+//
+// Single-line truncation: find a line that starts with `truncated` and use it.
+// Multi-line truncation: walk forward from the first line that starts with the
+// truncated prompt's first line, accumulating raw blob lines until we hit a
+// chrome line (timestamp, model badge, button label, etc.). Chrome marks the
+// boundary between the user bubble and the assistant response in the AX tree.
+export function recoverPromptFromBlob(
+  app: TargetApp,
+  truncated: string,
+  blob: string,
+): string {
+  if (!blob || !truncated) return truncated;
+  // Antigravity's user-bubble path is more reliable than blob recovery; skip.
+  if (app === "antigravity") return truncated;
+
+  const trimmedTrunc = truncated.trim();
+  if (trimmedTrunc.length < 5) return truncated;
+
+  // Single-line: search for a line starting with the truncated prompt. Iterate
+  // from the bottom so we prefer the most recent occurrence (the just-sent
+  // bubble) over any earlier echo of the same text in the conversation.
+  if (!trimmedTrunc.includes("\n")) {
+    const lines = blob.split("\n").map((l) => l.trim());
+    for (let i = lines.length - 1; i >= 0; i--) {
+      const line = lines[i];
+      if (
+        line &&
+        line.length >= trimmedTrunc.length &&
+        line.startsWith(trimmedTrunc) &&
+        line.length < 16000 &&
+        stripChrome(app, line) !== ""
+      ) {
+        return line;
+      }
+    }
+    return truncated;
+  }
+
+  // Multi-line: walk the raw blob forward, accumulating non-chrome lines.
+  const truncFirstLine = trimmedTrunc.split("\n")[0] ?? "";
+  if (truncFirstLine.length < 5) return truncated;
+
+  const rawLines = blob.split("\n");
+  let startIdx = -1;
+  for (let i = 0; i < rawLines.length; i++) {
+    const t = (rawLines[i] ?? "").trim();
+    if (
+      t === truncFirstLine ||
+      (t.length >= truncFirstLine.length && t.startsWith(truncFirstLine))
+    ) {
+      startIdx = i;
+      break;
+    }
+  }
+  if (startIdx < 0) return truncated;
+
+  const chromeSet = CHROME_LINES[app];
+  const noisePatterns = RESPONSE_NOISE[app];
+  const collected: string[] = [];
+  let charCount = 0;
+  const MAX_CHARS = 16000;
+  const MAX_LINES = 500;
+
+  for (let i = startIdx; i < rawLines.length && i - startIdx < MAX_LINES; i++) {
+    const t = (rawLines[i] ?? "").trim();
+    if (!t) {
+      if (collected.length > 0) collected.push("");
+      continue;
+    }
+    if (chromeSet.has(t)) break;
+    let isNoise = false;
+    for (const re of noisePatterns) {
+      // Build a non-global variant to test a single line without lastIndex side effects.
+      const probe = new RegExp(re.source, re.flags.replace(/g/g, ""));
+      if (probe.test(t)) {
+        isNoise = true;
+        break;
+      }
+    }
+    if (isNoise) break;
+    collected.push(t);
+    charCount += t.length;
+    if (charCount > MAX_CHARS) break;
+  }
+
+  while (collected.length > 0 && collected[collected.length - 1] === "") {
+    collected.pop();
+  }
+
+  const result = collected.join("\n").trim();
+  if (result.length > trimmedTrunc.length && result.startsWith(truncFirstLine)) {
+    return result;
+  }
+  return truncated;
 }
 
 export function stripPlaceholder(app: TargetApp, text: string): string {

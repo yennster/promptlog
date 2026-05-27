@@ -214,6 +214,108 @@ test("CaptureLoop — Truncated prompt recovery works for ChatGPT/Claude", async
   }
 });
 
+test("CaptureLoop — Multi-line prompt truncated mid-word is recovered from the bubble in lastAssistantText", async () => {
+  const fakeClient = new FakeAxClient() as unknown as AxClient;
+  const loop = new CaptureLoop(fakeClient);
+  loop.autoSchedule = false;
+  const session = createSession({ name: "Multi-line Recovery Test" });
+
+  (fakeClient as any).snapshotResponse = {
+    ok: true,
+    composer: "",
+    lastAssistantText: "",
+    lastUserText: "",
+  };
+  loop.start(session.id);
+  (loop as any).settings.enabledApps = {
+    claude: true,
+    chatgpt: false,
+    codex: false,
+    antigravity: false,
+  };
+  await (loop as any).tick();
+
+  // Mid-typing capture of a multi-line prompt — last word is "iss" instead of "issue".
+  (fakeClient as any).snapshotResponse = {
+    ok: true,
+    composer:
+      "this is not a prompt that i sent during the current session recording\nAlso i don't want you to give me a diagnosis i want you to fix the iss",
+    lastAssistantText: "",
+    lastUserText: "",
+  };
+  await (loop as any).tick();
+
+  // Composer cleared on submit. The user's bubble is now the last large text
+  // region — chrome (timestamp) marks where it ends and the response begins.
+  (fakeClient as any).snapshotResponse = {
+    ok: true,
+    composer: "",
+    lastAssistantText:
+      "this is not a prompt that i sent during the current session recording\n\nAlso i don't want you to give me a diagnosis i want you to fix the issue\n12:34 PM\nI'll look into the capture timing issue.",
+    lastUserText: "",
+  };
+  await (loop as any).tick();
+  await (loop as any).tick();
+
+  const prompts = getSessionPrompts(session.id);
+  assert.equal(prompts.length, 1, "Prompt should be logged");
+  assert.equal(
+    prompts[0].promptText,
+    "this is not a prompt that i sent during the current session recording\n\nAlso i don't want you to give me a diagnosis i want you to fix the issue",
+    "Multi-line truncation should be recovered up to the chrome boundary",
+  );
+
+  loop.stop();
+  if ((loop as any).timer) {
+    clearTimeout((loop as any).timer);
+    (loop as any).timer = null;
+  }
+});
+
+test("CaptureLoop — Empty-then-populated AX tree is treated as baseline, not a new prompt", async () => {
+  // Bug scenario: the daemon's first tick after session start sees an empty AX
+  // tree (app unfocused, or tree not yet populated). On a later tick the chat
+  // history surfaces — without this guard, the historical user bubble appears
+  // to be a brand-new prompt and gets captured into the active session.
+  const fakeClient = new FakeAxClient() as unknown as AxClient;
+  const loop = new CaptureLoop(fakeClient);
+  loop.autoSchedule = false;
+  const session = createSession({ name: "Empty-Then-Populated Test" });
+
+  (fakeClient as any).snapshotResponse = {
+    ok: true,
+    composer: "",
+    lastAssistantText: "",
+    lastUserText: "",
+  };
+  loop.start(session.id);
+  (loop as any).settings.enabledApps = {
+    claude: false,
+    chatgpt: false,
+    codex: false,
+    antigravity: true,
+  };
+  await (loop as any).tick();
+
+  // Chat history surfaces — this is the previous user's bubble, NOT a new send.
+  (fakeClient as any).snapshotResponse = {
+    ok: true,
+    composer: "",
+    lastAssistantText: "Agent: prior answer text",
+    lastUserText: "User message\nold prompt from a previous conversation\n12:00 PM",
+  };
+  await (loop as any).tick();
+
+  const prompts = getSessionPrompts(session.id);
+  assert.equal(prompts.length, 0, "Historical content surfacing must not be captured as a new prompt");
+
+  loop.stop();
+  if ((loop as any).timer) {
+    clearTimeout((loop as any).timer);
+    (loop as any).timer = null;
+  }
+});
+
 // Clean up database connection and sandboxed HOME directory after all tests
 test.after(() => {
   sqlite.close();

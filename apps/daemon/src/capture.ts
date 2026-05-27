@@ -1,7 +1,7 @@
 import { insertPrompt, updatePromptResponse } from "@promptlog/db/queries";
 import type { TargetApp } from "@promptlog/shared";
 import type { AxClient } from "./ax.js";
-import { extractAssistantResponse, snapshotApp, stripChrome } from "./adapters.js";
+import { extractAssistantResponse, recoverPromptFromBlob, snapshotApp, stripChrome } from "./adapters.js";
 import { currentGuess, refreshFocus } from "./cwd.js";
 import { readDaemonSettings } from "./settings.js";
 
@@ -38,8 +38,10 @@ const PENDING_TIMEOUT_MS = 60_000;
 // How long a staged candidate prompt stays alive waiting for chat activity
 // to confirm the send. If the chat doesn't update within this window we
 // assume the composer was cleared for a reason other than enter (focus
-// changed, ESC, the app cycled its placeholder, etc.) and discard.
-const CANDIDATE_TIMEOUT_MS = 5_000;
+// changed, ESC, the app cycled its placeholder, etc.) and discard. Long
+// prompts can take 10+ seconds before the assistant starts streaming, so
+// keep this generous.
+const CANDIDATE_TIMEOUT_MS = 30_000;
 
 export class CaptureLoop {
   private settings = readDaemonSettings();
@@ -206,6 +208,16 @@ export class CaptureLoop {
       (snap.composer.trim().includes(cleanedUserBubble) ||
         cleanedUserBubble.includes(snap.composer.trim()));
 
+    // If the prior snapshot had no visibility into the chat (composer empty,
+    // assistant empty, user bubble empty) then a bubble appearing now is the
+    // AX tree finally populating — typically because the app was unfocused or
+    // still loading on the first tick. Don't treat that as a new send, or
+    // we'd capture whatever historical prompt happens to be at the bottom of
+    // the conversation. Only fire userBubbleSent once we've actually seen
+    // some chat content before.
+    const hadPriorContext =
+      prior.assistant.length > 0 || cleanedPriorUserBubble.length > 0;
+
     const userBubbleSent =
       !isFirstSnap &&
       !composerSent &&
@@ -213,27 +225,16 @@ export class CaptureLoop {
       prior.candidatePromptText === "" &&
       cleanedUserBubble.length >= 2 &&
       cleanedUserBubble !== cleanedPriorUserBubble &&
+      hadPriorContext &&
       !isTypingInComposer &&
       this.activeSessionId !== null;
 
     // Stage composerSent as a candidate prompt — don't insert yet.
     if (composerSent && prior.pendingPromptId === null) {
       let promptText = prior.composer;
-      // Recovery fallback for ChatGPT/Claude/Codex:
-      // Try to recover the full prompt line from snap.lastAssistantText if possible
-      if (snap.lastAssistantText && (app === "chatgpt" || app === "claude" || app === "codex")) {
-        const lines = snap.lastAssistantText.split("\n").map((l) => l.trim());
-        for (let i = lines.length - 1; i >= 0; i--) {
-          const line = lines[i];
-          if (line && line.length >= promptText.length && line.startsWith(promptText)) {
-            const isChrome = stripChrome(app, line) === "";
-            if (!isChrome && line.length < 1000) {
-              promptText = line;
-              break;
-            }
-          }
-        }
-      }
+      // Composer may have been observed mid-typing or between keystrokes. The
+      // user's just-sent bubble in lastAssistantText usually has the full text.
+      promptText = recoverPromptFromBlob(app, promptText, snap.lastAssistantText);
       prior.candidatePromptText = promptText;
       prior.candidateStagedAt = now;
       prior.candidateBaselineAssistant = prior.assistant;
@@ -276,24 +277,12 @@ export class CaptureLoop {
           promptText = cleanedUserBubble;
         }
 
-        // Recovery fallback for ChatGPT/Claude/Codex:
-        // Try to recover the full prompt line from snap.lastAssistantText if possible
-        if (
-          promptText === prior.candidatePromptText &&
-          snap.lastAssistantText &&
-          (app === "chatgpt" || app === "claude" || app === "codex")
-        ) {
-          const lines = snap.lastAssistantText.split("\n").map((l) => l.trim());
-          for (let i = lines.length - 1; i >= 0; i--) {
-            const line = lines[i];
-            if (line && line.length >= promptText.length && line.startsWith(promptText)) {
-              const isChrome = stripChrome(app, line) === "";
-              if (!isChrome && line.length < 1000) {
-                promptText = line;
-                break;
-              }
-            }
-          }
+        // If the user-bubble preference didn't replace promptText, try to
+        // recover a fuller version from lastAssistantText. Useful when the
+        // composer was caught mid-typing and the bubble in the AX tree has
+        // more text than what we staged.
+        if (promptText === prior.candidatePromptText) {
+          promptText = recoverPromptFromBlob(app, promptText, snap.lastAssistantText);
         }
 
         this.insertConfirmedPrompt(prior, app, promptText, prior.candidateStagedAt, prior.candidateBaselineAssistant);
