@@ -25,6 +25,7 @@ interface PerAppState {
   pendingPromptText: string;
   pendingPromptSentAt: number;
   pendingPromptApp: TargetApp;
+  pendingBaselineAssistant: string;
 }
 
 const STABLE_MS = 1500;
@@ -121,6 +122,7 @@ export class CaptureLoop {
     app: TargetApp,
     promptText: string,
     sentAtMs: number,
+    baselineAssistant: string,
   ) {
     const cwdGuess = currentGuess();
     const inTokens = estimateTokens(promptText, app);
@@ -138,6 +140,7 @@ export class CaptureLoop {
     prior.pendingPromptText = promptText;
     prior.pendingPromptSentAt = sentAtMs;
     prior.pendingPromptApp = app;
+    prior.pendingBaselineAssistant = baselineAssistant;
     prior.assistantStableSince = 0;
   }
 
@@ -157,6 +160,7 @@ export class CaptureLoop {
         pendingPromptText: "",
         pendingPromptSentAt: 0,
         pendingPromptApp: app,
+        pendingBaselineAssistant: "",
       };
       this.state.set(app, s);
     }
@@ -219,13 +223,29 @@ export class CaptureLoop {
 
     // Stage composerSent as a candidate prompt — don't insert yet.
     if (composerSent && prior.pendingPromptId === null) {
-      prior.candidatePromptText = prior.composer;
+      let promptText = prior.composer;
+      // Recovery fallback for ChatGPT/Claude/Codex:
+      // Try to recover the full prompt line from snap.lastAssistantText if possible
+      if (snap.lastAssistantText && (app === "chatgpt" || app === "claude" || app === "codex")) {
+        const lines = snap.lastAssistantText.split("\n").map((l) => l.trim());
+        for (let i = lines.length - 1; i >= 0; i--) {
+          const line = lines[i];
+          if (line && line.length >= promptText.length && line.startsWith(promptText)) {
+            const isChrome = stripChrome(app, line) === "";
+            if (!isChrome && line.length < 1000) {
+              promptText = line;
+              break;
+            }
+          }
+        }
+      }
+      prior.candidatePromptText = promptText;
       prior.candidateStagedAt = now;
       prior.candidateBaselineAssistant = prior.assistant;
       prior.candidateBaselineUserBubble = cleanedPriorUserBubble;
       console.log(
-        `[capture] ${app}: candidate staged (${prior.composer.length} chars): ` +
-          `"${prior.composer.slice(0, 60).replace(/\n/g, " ")}"`,
+        `[capture] ${app}: candidate staged (${prior.candidatePromptText.length} chars): ` +
+          `"${prior.candidatePromptText.slice(0, 60).replace(/\n/g, " ")}"`,
       );
     }
 
@@ -260,7 +280,28 @@ export class CaptureLoop {
         ) {
           promptText = cleanedUserBubble;
         }
-        this.insertConfirmedPrompt(prior, app, promptText, prior.candidateStagedAt);
+
+        // Recovery fallback for ChatGPT/Claude/Codex:
+        // Try to recover the full prompt line from snap.lastAssistantText if possible
+        if (
+          promptText === prior.candidatePromptText &&
+          snap.lastAssistantText &&
+          (app === "chatgpt" || app === "claude" || app === "codex")
+        ) {
+          const lines = snap.lastAssistantText.split("\n").map((l) => l.trim());
+          for (let i = lines.length - 1; i >= 0; i--) {
+            const line = lines[i];
+            if (line && line.length >= promptText.length && line.startsWith(promptText)) {
+              const isChrome = stripChrome(app, line) === "";
+              if (!isChrome && line.length < 1000) {
+                promptText = line;
+                break;
+              }
+            }
+          }
+        }
+
+        this.insertConfirmedPrompt(prior, app, promptText, prior.candidateStagedAt, prior.candidateBaselineAssistant);
         console.log(
           `[capture] ${app}: prompt confirmed via ${userBubbleAppeared ? "userBubble" : "assistantGrew"} ` +
             `(${promptText.length} chars)`,
@@ -277,7 +318,7 @@ export class CaptureLoop {
 
     // userBubbleSent: insert immediately, no staging needed.
     if (userBubbleSent) {
-      this.insertConfirmedPrompt(prior, app, cleanedUserBubble, now);
+      this.insertConfirmedPrompt(prior, app, cleanedUserBubble, now, prior.assistant);
       console.log(
         `[capture] ${app}: prompt detected via userBubble ` +
           `(${cleanedUserBubble.length} chars)`,
@@ -307,6 +348,7 @@ export class CaptureLoop {
         app,
         snap.lastAssistantText,
         prior.pendingPromptText,
+        prior.pendingBaselineAssistant,
       );
       // Treat the snapshot as a real assistant response only if there's
       // genuinely something there after chrome stripping + prompt-anchor

@@ -115,6 +115,53 @@ test("stripChrome strips composer + status bar chrome", () => {
   assert.equal(result, "The actual response goes here.");
 });
 
+test("claude: new UI chrome (just now, Send, 1M, High) is stripped", () => {
+  const input = [
+    "just now",
+    "The clean response goes here.",
+    "just now",
+    "Send",
+    "1M",
+    "· High",
+  ].join("\n");
+  const result = stripChrome("claude", input);
+  assert.equal(result, "The clean response goes here.");
+});
+
+test("extractAssistantResponse slices off baselineText to prevent bleeding", () => {
+  const baseline = "Old prompt\nOld reply";
+  const blob = [
+    "Old prompt",
+    "Old reply",
+    "New prompt",
+    "New reply",
+  ].join("\n");
+  const result = extractAssistantResponse(
+    "chatgpt",
+    blob,
+    "New prompt",
+    baseline,
+  );
+  assert.equal(result, "New reply");
+});
+
+test("extractAssistantResponse slices off baselineText even if prompt anchor fails", () => {
+  const baseline = "Old prompt\nOld reply";
+  const blob = [
+    "Old prompt",
+    "Old reply",
+    "New prompt with mismatch",
+    "New reply",
+  ].join("\n");
+  const result = extractAssistantResponse(
+    "chatgpt",
+    blob,
+    "New prompt", // this won't match exactly because of mismatch
+    baseline,
+  );
+  assert.equal(result, "New prompt with mismatch\nNew reply");
+});
+
 test("extractAssistantResponse anchors on prompt and strips chrome", () => {
   const blob = [
     "Some earlier conversation context",

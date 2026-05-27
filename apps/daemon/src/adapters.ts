@@ -157,6 +157,19 @@ const CHROME_LINES: Record<TargetApp, Set<string>> = {
     "Type / for commands",
     "main",
     "Arrow keys move the tile. Perpendicular arrows preview a split; press Enter to commit or Escape to cancel.",
+    // New Claude UI chrome
+    "just now",
+    "Send",
+    "1M",
+    "· High",
+    "· Standard",
+    "· Low",
+    "High",
+    "Standard",
+    "Low",
+    "Opus",
+    "Sonnet",
+    "Haiku",
   ]),
   chatgpt: new Set(["Copy", "Regenerate"]),
   codex: new Set([
@@ -261,9 +274,37 @@ export function extractAssistantResponse(
   app: TargetApp,
   blob: string,
   promptText: string,
+  baselineText?: string,
 ): string {
   if (!blob) return "";
   let text = blob;
+
+  if (baselineText) {
+    const baselineIndex = text.indexOf(baselineText);
+    if (baselineIndex >= 0) {
+      text = text.slice(baselineIndex + baselineText.length);
+    } else {
+      // Try a suffix match in case there are minor whitespace or timestamp drift.
+      const lines = baselineText.split("\n").map(l => l.trim()).filter(Boolean);
+      if (lines.length > 0) {
+        // Try the last 3 lines
+        const lastFew = lines.slice(-3).join("\n");
+        const suffixIndex = text.lastIndexOf(lastFew);
+        if (suffixIndex >= 0) {
+          text = text.slice(suffixIndex + lastFew.length);
+        } else {
+          // If that fails, try matching just the last line
+          const lastOne = lines[lines.length - 1];
+          if (lastOne) {
+            const lastLineIndex = text.lastIndexOf(lastOne);
+            if (lastLineIndex >= 0) {
+              text = text.slice(lastLineIndex + lastOne.length);
+            }
+          }
+        }
+      }
+    }
+  }
 
   // Anchor on the user's own prompt if we can find it at line boundaries.
   // This signals a user-message bubble rather than an echo inside the response.

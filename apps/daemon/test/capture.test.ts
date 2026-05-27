@@ -153,6 +153,67 @@ test("CaptureLoop — Keystroke draft guard prevents logging unsent drafts", asy
   }
 });
 
+test("CaptureLoop — Truncated prompt recovery works for ChatGPT/Claude", async () => {
+  const fakeClient = new FakeAxClient() as unknown as AxClient;
+  const loop = new CaptureLoop(fakeClient);
+  loop.autoSchedule = false;
+  const session = createSession({ name: "Recovery Test" });
+
+  // 1. First tick (baseline)
+  (fakeClient as any).snapshotResponse = {
+    ok: true,
+    composer: "",
+    lastAssistantText: "",
+    lastUserText: "",
+  };
+  loop.start(session.id);
+  (loop as any).settings.enabledApps = {
+    claude: false,
+    chatgpt: true,
+    codex: false,
+    antigravity: false,
+  };
+  await (loop as any).tick();
+
+  // 2. Second tick — User is typing "another"
+  (fakeClient as any).snapshotResponse = {
+    ok: true,
+    composer: "another",
+    lastAssistantText: "",
+    lastUserText: "",
+  };
+  await (loop as any).tick();
+
+  // 3. Third tick — User completes typing "another test" and hits Enter.
+  // The composer is cleared, and "another test" appears in the history.
+  (fakeClient as any).snapshotResponse = {
+    ok: true,
+    composer: "",
+    lastAssistantText: "another test",
+    lastUserText: "",
+  };
+  await (loop as any).tick();
+
+  // 4. Fourth tick — Assistant starts responding, confirming the candidate prompt
+  (fakeClient as any).snapshotResponse = {
+    ok: true,
+    composer: "",
+    lastAssistantText: "another test\nWorks on my side too 👍",
+    lastUserText: "",
+  };
+  await (loop as any).tick();
+
+  let prompts = getSessionPrompts(session.id);
+  assert.equal(prompts.length, 1, "Prompt should be logged");
+  assert.equal(prompts[0].promptText, "another test", "Should successfully recover the full untruncated prompt text");
+
+  loop.stop();
+  if ((loop as any).timer) {
+    clearTimeout((loop as any).timer);
+    (loop as any).timer = null;
+  }
+});
+
 // Clean up database connection and sandboxed HOME directory after all tests
 test.after(() => {
   sqlite.close();
