@@ -52,6 +52,11 @@ pnpm dev
   pnpm test
   ```
 
+- **Run all verification checks locally (typechecks, builds the Next.js app, and runs tests)**:
+  ```sh
+  pnpm verify
+  ```
+
 On first run, grant **Accessibility** permission to `apps/ax-capture/AxCapture.app` in **System Settings → Privacy & Security → Accessibility**. The dashboard's `/settings` page shows current permission status and lets you toggle which apps the capture loop polls (Claude / ChatGPT / Codex / Antigravity).
 
 > **Why an .app bundle, not the bare binary?** macOS TCC attributes Accessibility checks to the "responsible" app of the process tree. A bare CLI binary launched from a terminal inherits the terminal's TCC identity — so even if you toggle the binary on, macOS may check your terminal app's permission instead. Wrapping the helper in a `.app` bundle gives it its own bundle identifier and an independent TCC identity, so the toggle does what you'd expect regardless of which terminal launched it.

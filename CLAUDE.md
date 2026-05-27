@@ -43,6 +43,10 @@ pnpm dev
   ```bash
   pnpm -C apps/daemon test
   ```
+- **Run Unified Verification Gate**: Performs typechecks, Next.js production builds, and runs all unit tests:
+  ```bash
+  pnpm verify
+  ```
 
 ### AX-Debug Harness
 For iterating on the AX-blob filtering pipeline without driving the UI:
@@ -101,3 +105,5 @@ pnpm -C apps/daemon ax:replay <fixture> [prompt] # replay through the filter
 - **Per-app chrome filters live in `apps/daemon/src/adapters.ts`**: `RESPONSE_NOISE` (regex strips that can run anywhere — disclaimers, model picker, timestamp lines) and `CHROME_LINES` (exact-line drops — toolbar/control button labels like `Copy`, `Retry`). Prefer `CHROME_LINES` for short labels that could plausibly appear inside real prose; prefer `RESPONSE_NOISE` for patterns with dynamic content (timestamps, "Ran N commands", model badges).
 - **Prompt anchoring is line-based**: `extractAssistantResponse` only slices on the prompt when it appears as a complete line in the blob. Substring matches via `lastIndexOf` over-slice when the response echoes the prompt mid-sentence.
 - **Two prompt detectors run in parallel**: `composerSent` (composer transitions text→empty — primary) and `userBubbleSent` (a new "User message" labeled AXGroup appears — fallback for Antigravity-style labeled apps, used when the composer transition was missed). The user-bubble path is also preferred over a composer capture when it's a longer superstring, because the composer can be caught mid-typing.
+- **Antigravity Paragraph Rejoining**: Antigravity's AX tree represents streaming/rendered prose as one AX element per word, which `collectText` joins with newlines. `stripChrome` detects and rejoins these consecutive short word and punctuation lines back into single flowing paragraphs for readability.
+- **Testing CaptureLoop Timers**: When unit testing `CaptureLoop`, set `loop.autoSchedule = false` to prevent manual `tick()` invocations from scheduling overlapping/leaked background `setTimeout` cycles.
