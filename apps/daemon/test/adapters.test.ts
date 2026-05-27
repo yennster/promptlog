@@ -290,6 +290,39 @@ test("antigravity: strips Agent response label + bubble chrome", () => {
   );
 });
 
+test("antigravity: rejoins paragraph text from word-per-line AX inputs", () => {
+  const blob = [
+    "Thinking.",
+    "Thinking",
+    ".",
+    "Reviewing Previous Inputs",
+    "I'm",
+    "now",
+    "analyzing",
+    "the",
+    "user's",
+    "feedback,",
+    "focusing",
+    "on",
+    "the",
+    "issue",
+    "of",
+    "retrieving",
+    "prompts",
+    "prior",
+    "to",
+    "the",
+    "\"start",
+    "recording\"",
+    "activation.",
+  ].join("\n");
+  const result = stripChrome("antigravity", blob);
+  assert.equal(
+    result,
+    "Thinking. Thinking.\nReviewing Previous Inputs\nI'm now analyzing the user's feedback, focusing on the issue of retrieving prompts prior to the \"start recording\" activation."
+  );
+});
+
 test("chatgpt: strips composer placeholder + disclaimer + Copy/Regenerate", () => {
   // ChatGPT's AX tree is the cleanest of the four target apps — assistant
   // text comes through with no per-message chrome in the captured group most

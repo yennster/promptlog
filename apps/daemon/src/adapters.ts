@@ -207,6 +207,40 @@ export function stripChrome(app: TargetApp, blob: string): string {
   for (const line of lines) {
     if (deduped[deduped.length - 1] !== line) deduped.push(line);
   }
+
+  // Antigravity paragraph rejoining:
+  // Antigravity's AX tree represents streaming/rendered prose as one AX element per word,
+  // which collectText joins with newlines. We rejoin consecutive word lines into paragraphs.
+  if (app === "antigravity") {
+    const joinedLines: string[] = [];
+    let currentLine = "";
+
+    for (const line of deduped) {
+      const isPunctuationOnly = /^[.,\/#!$%\^&\*;:{}=\-_`~()?"']{1,2}$/.test(line);
+      const isWord = !line.includes(" ") || line.length <= 15;
+
+      if (isWord || isPunctuationOnly) {
+        if (currentLine === "") {
+          currentLine = line;
+        } else {
+          const separator = (isPunctuationOnly && !line.startsWith('"') && !line.startsWith("'")) ? "" : " ";
+          currentLine += separator + line;
+        }
+      } else {
+        if (currentLine !== "") {
+          joinedLines.push(currentLine);
+          currentLine = "";
+        }
+        joinedLines.push(line);
+      }
+    }
+
+    if (currentLine !== "") {
+      joinedLines.push(currentLine);
+    }
+    return joinedLines.join("\n").trim();
+  }
+
   return deduped.join("\n").trim();
 }
 
