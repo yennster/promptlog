@@ -25,24 +25,20 @@ import {
 const here = dirname(fileURLToPath(import.meta.url));
 const FIXTURE_DIR = resolve(here, "fixtures");
 
-test("stripChrome removes Copy/Edit/Retry only as standalone lines", () => {
+test("stripChrome removes Untitled/just now only as standalone lines", () => {
   const input = [
-    "Click Edit to change this.",
-    "Copy",
-    "The Retry button is on the right.",
-    "Retry",
-    "Settings panel is here.",
-    "Settings",
+    "The document is Untitled.",
+    "Untitled",
+    "It happened just now in the chat.",
+    "just now",
   ].join("\n");
   const result = stripChrome("claude", input);
   // Standalone chrome lines dropped.
-  assert.ok(!result.split("\n").includes("Copy"));
-  assert.ok(!result.split("\n").includes("Retry"));
-  assert.ok(!result.split("\n").includes("Settings"));
+  assert.ok(!result.split("\n").includes("Untitled"));
+  assert.ok(!result.split("\n").includes("just now"));
   // Words inside prose survive.
-  assert.ok(result.includes("Click Edit to change this."));
-  assert.ok(result.includes("The Retry button is on the right."));
-  assert.ok(result.includes("Settings panel is here."));
+  assert.ok(result.includes("The document is Untitled."));
+  assert.ok(result.includes("It happened just now in the chat."));
 });
 
 test("stripChrome dedupes consecutive identical lines", () => {
@@ -54,8 +50,6 @@ test("stripChrome dedupes consecutive identical lines", () => {
 test("stripChrome strips per-message footer chrome", () => {
   const input = [
     "Bananas are berries.",
-    "Copy message",
-    "Pin as chapter",
     "2m ago",
   ].join("\n");
   const result = stripChrome("claude", input);
@@ -70,7 +64,6 @@ test("stripChrome strips dynamic chrome (Ran N commands, X additions, etc)", () 
     "238 additions, 0 deletions",
     "3.1k tokens",
     "Usage: context 13%, plan 41%",
-    "Opus 4.7 1M · High",
     "2m 31s",
     "17m ago",
   ].join("\n");
@@ -100,29 +93,18 @@ test("stripChrome strips fragmented tool-use breadcrumbs", () => {
 test("stripChrome strips composer + status bar chrome", () => {
   const input = [
     "The actual response goes here.",
-    "Chat mode",
     "Type / for commands",
-    "Prompt",
-    "Stop",
-    "Auto",
-    "Add",
-    "Dictation",
-    "Press and hold to record",
-    "Dictation settings",
     "Arrow keys move the tile. Perpendicular arrows preview a split; press Enter to commit or Escape to cancel.",
   ].join("\n");
   const result = stripChrome("claude", input);
   assert.equal(result, "The actual response goes here.");
 });
 
-test("claude: new UI chrome (just now, Send, 1M, High) is stripped", () => {
+test("claude: new UI chrome (just now) is stripped", () => {
   const input = [
     "just now",
     "The clean response goes here.",
     "just now",
-    "Send",
-    "1M",
-    "· High",
   ].join("\n");
   const result = stripChrome("claude", input);
   assert.equal(result, "The clean response goes here.");
@@ -165,17 +147,10 @@ test("extractAssistantResponse slices off baselineText even if prompt anchor fai
 test("extractAssistantResponse anchors on prompt and strips chrome", () => {
   const blob = [
     "Some earlier conversation context",
-    "Copy message",
-    "Pin as chapter",
     "10m ago",
     "What's a random fact?",  // user prompt
-    "Copy message",
-    "Rewind to here",
-    "Fork from here",
     "5m ago",
     "Bananas are berries, but strawberries aren't.",
-    "Copy message",
-    "Pin as chapter",
     "2m ago",
     "Type / for commands",
   ].join("\n");
@@ -205,7 +180,6 @@ test("extractAssistantResponse — prompt anchor still works for whole-line user
   const blob = [
     "What is 2+2?",
     "4",
-    "Copy message",
   ].join("\n");
   const result = extractAssistantResponse("claude", blob, "What is 2+2?");
   assert.equal(result, "4");
@@ -240,12 +214,9 @@ test("extractAssistantResponse — prefers user-bubble-marker context over later
     "adfsdfasdf",
     "",
     "11:42 PM",
-    "Copy message",
-    "Edit message",
     "That came through as",
     "adfsdfasdf", // markdown-echo as a standalone line
     ", so the message pipeline is alive at least.",
-    "Copy",
   ].join("\n");
   const result = extractAssistantResponse("codex", blob, "adfsdfasdf");
   // The response should include the echo and the surrounding sentence.
@@ -275,8 +246,6 @@ test("extractAssistantResponse — multi-line response survives", () => {
     "Once upon a time, there was a wombat.",
     "The wombat had cube-shaped poop.",
     "The end.",
-    "Copy message",
-    "Pin as chapter",
     "1m ago",
   ].join("\n");
   const result = extractAssistantResponse("claude", blob, "Tell me a story");
@@ -292,10 +261,8 @@ test("extractAssistantResponse — multi-line prompt anchors correctly", () => {
     "Line 1 of prompt",
     "Line 2 of prompt",
     "12:00 PM",
-    "Copy message",
     "Here is the response",
     "to the multi-line prompt.",
-    "Copy message",
   ].join("\n");
   const prompt = "Line 1 of prompt\nLine 2 of prompt";
   const result = extractAssistantResponse("claude", blob, prompt);
@@ -314,7 +281,6 @@ test("antigravity: stripChrome cleans the user-bubble text the daemon uses as a 
     "User message",
     "testing again",
     "11:29 PM",
-    "Copy",
   ].join("\n");
   const result = stripChrome("antigravity", blob);
   assert.equal(result, "testing again");
@@ -326,9 +292,6 @@ test("antigravity: strips Agent response label + bubble chrome", () => {
     "It looks like your message might have been a typo.",
     "How can I help you today?",
     "9:57 PM",
-    "Copy",
-    "Good response",
-    "Bad response",
   ].join("\n");
   const result = stripChrome("antigravity", blob);
   assert.equal(
@@ -381,8 +344,6 @@ test("chatgpt: strips composer placeholder + disclaimer + Copy/Regenerate", () =
     "1. Octopuses have three hearts.",
     "2. Honey never spoils.",
     "3. Bananas are berries.",
-    "Copy",
-    "Regenerate",
     "ChatGPT can make mistakes. Check important info.",
   ].join("\n");
   const result = stripChrome("chatgpt", blob);
@@ -400,8 +361,6 @@ test("chatgpt: prompt anchoring extracts response only", () => {
     "Here are three:",
     "Octopuses have three hearts.",
     "Honey never spoils.",
-    "Copy",
-    "Regenerate",
     "ChatGPT can make mistakes.",
   ].join("\n");
   const result = extractAssistantResponse(
@@ -417,24 +376,13 @@ test("chatgpt: prompt anchoring extracts response only", () => {
 
 test("codex: strips per-message chrome and model badge", () => {
   const blob = [
-    "Edit user message",
     "laskdfjlsdkjf",
     "9:58 PM",
-    "Copy message",
-    "Edit message",
     "I'm here. What would you like me to do?",
-    "Copy",
-    "Good response",
-    "Bad response",
-    "Fork from this point",
     "9:58 PM",
-    "Ask for follow-up changes",
-    "Add files and more",
-    "Auto-review",
     "5.5 Extra High",
     "5.5",
     "Extra High",
-    "Dictate",
   ].join("\n");
   const result = stripChrome("codex", blob);
   assert.equal(
@@ -449,7 +397,6 @@ test("extractAssistantResponse — prose containing chrome-word survives", () =>
   const blob = [
     "How do I retry?",
     "Click the Retry button or press Cmd+R to retry the failed request. Settings can also be adjusted.",
-    "Copy message",
   ].join("\n");
   const result = extractAssistantResponse("claude", blob, "How do I retry?");
   assert.equal(
@@ -464,27 +411,12 @@ test("extractAssistantResponse — prose containing chrome-word survives", () =>
 // and free of known chrome strings.
 const FORBIDDEN_CHROME = [
   // Claude desktop
-  "Copy message",
-  "Pin as chapter",
-  "Rewind to here",
-  "Fork from here",
   "Type / for commands",
-  "Dictation settings",
-  "Press and hold to record",
-  "Use voice mode",
   // ChatGPT
   "Send a message",
-  "Regenerate",
   // Antigravity
   "Agent response",
-  "Good response",
-  "Bad response",
   "Ask anything, @ to mention, / for actions",
-  // Codex
-  "Edit user message",
-  "Edit message",
-  "Fork from this point",
-  "Ask for follow-up changes",
 ];
 
 if (existsSync(FIXTURE_DIR)) {

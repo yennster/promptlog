@@ -137,6 +137,23 @@ func collectText(_ root: AXUIElement, limit: Int = 64_000) -> String {
     var total = 0
     walk(root) { el, _ in
         if total >= limit { return false }
+        
+        // Skip interactive elements (buttons, popups, menus, checkboxes, radio buttons, switches)
+        // and all their children to cleanly filter out UI chrome.
+        if let role = stringAttribute(el, kAXRoleAttribute) {
+            let skipRoles: Set<String> = [
+                "AXButton",
+                "AXPopUpButton",
+                "AXMenuButton",
+                "AXCheckBox",
+                "AXRadioButton",
+                "AXSwitch"
+            ]
+            if skipRoles.contains(role) {
+                return false // Skip this element and its descendants
+            }
+        }
+        
         for attr in [kAXValueAttribute, kAXTitleAttribute, kAXDescriptionAttribute] {
             if let s = stringAttribute(el, attr), !s.isEmpty {
                 pieces.append(s)

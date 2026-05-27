@@ -81,7 +81,7 @@ test("CaptureLoop — First snapshot baseline guard works", async () => {
     ok: true,
     composer: "",
     lastAssistantText: "Agent: Hello!",
-    lastUserText: "User message\nhello new day\n12:01 PM\nCopy",
+    lastUserText: "User message\nhello new day\n12:01 PM",
   };
 
   await (loop as any).tick();
@@ -126,7 +126,7 @@ test("CaptureLoop — Keystroke draft guard prevents logging unsent drafts", asy
     ok: true,
     composer: "can you",
     lastAssistantText: "",
-    lastUserText: "User message\ncan you\n12:00 PM\nCopy",
+    lastUserText: "User message\ncan you\n12:00 PM",
   };
   await (loop as any).tick();
 
@@ -138,7 +138,7 @@ test("CaptureLoop — Keystroke draft guard prevents logging unsent drafts", asy
     ok: true,
     composer: "", // composer cleared on submit
     lastAssistantText: "Agent: How can I help?",
-    lastUserText: "User message\ncan you please help me\n12:01 PM\nCopy",
+    lastUserText: "User message\ncan you please help me\n12:01 PM",
   };
   await (loop as any).tick();
 
